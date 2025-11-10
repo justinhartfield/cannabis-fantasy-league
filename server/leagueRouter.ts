@@ -41,7 +41,7 @@ export const leagueRouter = router({
       try {
         // Create league
         const currentYear = new Date().getFullYear();
-        const [leagueResult] = await db
+        const leagueResult = await db
           .insert(leagues)
           .values({
             name: input.name,
@@ -56,7 +56,9 @@ export const leagueRouter = router({
           })
           .$returningId();
 
-        const leagueId = leagueResult.id;
+        const leagueId = leagueResult[0].id;
+        console.log('[LeagueRouter] leagueResult:', leagueResult);
+        console.log('[LeagueRouter] leagueId:', leagueId);
 
         // Create commissioner's team
         await db.insert(teams).values({
