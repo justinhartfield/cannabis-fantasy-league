@@ -6,27 +6,58 @@ import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
+  const projectRoot = path.resolve(import.meta.dirname, "..");
+  const clientRoot = path.resolve(projectRoot, "client");
+  
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true as const,
+    hmr: false, // Disable HMR to fix timeout issues
+    allowedHosts: ['.manusvm.computer', 'localhost'], // Allow Manus VM hosts
   };
 
+  console.log('[Vite] Creating Vite server...');
+  console.log('[Vite] projectRoot:', projectRoot);
+  console.log('[Vite] clientRoot:', clientRoot);
+  console.log('[Vite] viteConfig.server:', viteConfig.server);
+  console.log('[Vite] serverOptions:', serverOptions);
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
-    server: serverOptions,
+    root: clientRoot, // Override root to correct path
+    resolve: {
+      alias: {
+        "@": path.resolve(clientRoot, "src"),
+        "@shared": path.resolve(projectRoot, "shared"),
+        "@assets": path.resolve(projectRoot, "attached_assets"),
+      },
+    },
+    server: {
+      ...serverOptions,
+      ...viteConfig.server,
+      allowedHosts: ['.manusvm.computer', 'localhost'], // Ensure this is not overridden
+    },
     appType: "custom",
+    optimizeDeps: {
+      force: false,
+    },
   });
+  console.log('[Vite] Vite server created successfully');
 
   app.use(vite.middlewares);
+  
+  // Serve index.html for all non-API routes
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
+
+    // Skip API routes
+    if (url.startsWith('/api/')) {
+      return next();
+    }
 
     try {
       const clientTemplate = path.resolve(
         import.meta.dirname,
-        "../..",
+        "..",
         "client",
         "index.html"
       );
@@ -36,6 +67,7 @@ export async function setupVite(app: Express, server: Server) {
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
+      console.error('[Vite] Error:', e);
       vite.ssrFixStacktrace(e as Error);
       next(e);
     }
