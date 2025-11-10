@@ -5,13 +5,11 @@
  * 
  * This script runs automatically on Railway deployment to:
  * 1. Check if database tables exist
- * 2. Create tables if they don't exist
- * 3. Seed initial data if needed
+ * 2. Create tables if they don't exist using Drizzle Kit
  */
 
-import { drizzle } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
-import * as schema from '../drizzle/schema.ts';
+import { execSync } from 'child_process';
 
 async function initDatabase() {
   console.log('[DB Init] Starting database initialization...');
@@ -44,43 +42,21 @@ async function initDatabase() {
     );
 
     if (tables[0].count === 0) {
-      console.log('[DB Init] Tables do not exist. Creating schema...');
-      
-      // Read and execute schema file
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const { fileURLToPath } = await import('url');
-      
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = path.dirname(__filename);
-      const schemaPath = path.join(__dirname, '../drizzle/schema.sql');
+      console.log('[DB Init] Tables do not exist. Creating schema using Drizzle Kit...');
       
       try {
-        const schemaSQL = await fs.readFile(schemaPath, 'utf-8');
+        // Use drizzle-kit to push schema
+        console.log('[DB Init] Running: drizzle-kit push');
+        execSync('npx drizzle-kit push --force', { 
+          stdio: 'inherit',
+          env: { ...process.env }
+        });
         
-        // Split by semicolon and execute each statement
-        const statements = schemaSQL
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-        
-        for (const statement of statements) {
-          await connection.query(statement);
-        }
-        
-        console.log('[DB Init] Schema created successfully');
-      } catch (error) {
-        console.log('[DB Init] schema.sql not found, using Drizzle Kit...');
-        
-        // Alternative: Use drizzle-kit push
-        const { execSync } = await import('child_process');
-        try {
-          execSync('npx drizzle-kit push:mysql --force', { stdio: 'inherit' });
-          console.log('[DB Init] Schema pushed using Drizzle Kit');
-        } catch (drizzleError) {
-          console.error('[DB Init] Failed to push schema with Drizzle Kit:', drizzleError.message);
-          throw drizzleError;
-        }
+        console.log('[DB Init] Schema created successfully!');
+      } catch (drizzleError) {
+        console.error('[DB Init] Failed to push schema with Drizzle Kit');
+        console.error('[DB Init] Error:', drizzleError.message);
+        throw drizzleError;
       }
     } else {
       console.log('[DB Init] Tables already exist. Skipping schema creation.');
@@ -90,7 +66,9 @@ async function initDatabase() {
     
   } catch (error) {
     console.error('[DB Init] ERROR:', error.message);
-    console.error('[DB Init] Stack:', error.stack);
+    if (error.code === 'ECONNREFUSED') {
+      console.error('[DB Init] Cannot connect to database. Please check DATABASE_URL and ensure MySQL service is running.');
+    }
     process.exit(1);
   } finally {
     if (connection) {
