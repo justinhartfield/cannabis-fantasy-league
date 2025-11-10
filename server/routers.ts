@@ -9,6 +9,9 @@ import { rosterRouter } from "./rosterRouter";
 import { scoringRouter } from "./scoringRouter";
 import { statsRouter } from "./statsRouter";
 import { dataSyncRouter } from "./dataSyncRouter";
+import { matchupRouter } from "./matchupRouter";
+import { standingsRouter } from "./standingsRouter";
+import { playoffRouter } from "./playoffRouter";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -32,6 +35,9 @@ export const appRouter = router({
   scoring: scoringRouter,
   stats: statsRouter,
   dataSync: dataSyncRouter,
+  matchup: matchupRouter,
+  standings: standingsRouter,
+  playoff: playoffRouter,
 });
 
 export type AppRouter = typeof appRouter;
