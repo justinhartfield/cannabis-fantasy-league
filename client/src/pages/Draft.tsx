@@ -5,6 +5,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import DraftBoard from "@/components/DraftBoard";
+import { DraftClock } from "@/components/DraftClock";
 import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useEffect, useState } from "react";
@@ -20,8 +21,12 @@ export default function Draft() {
     pickNumber: number;
   }>>([]);
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
+  const [timeLimit, setTimeLimit] = useState<number>(90);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentTurnTeamId, setCurrentTurnTeamId] = useState<number | null>(null);
   const [currentTurnTeamName, setCurrentTurnTeamName] = useState<string>("");
+  const [currentPickNumber, setCurrentPickNumber] = useState<number>(1);
+  const [currentRound, setCurrentRound] = useState<number>(1);
 
   const leagueId = parseInt(id!);
 
@@ -69,16 +74,27 @@ export default function Draft() {
       } else if (message.type === 'next_pick') {
         setCurrentTurnTeamId(message.teamId);
         setCurrentTurnTeamName(message.teamName);
+        setCurrentPickNumber(message.pickNumber);
+        setCurrentRound(message.round);
         toast.info(`It's ${message.teamName}'s turn to pick!`);
       } else if (message.type === 'draft_complete') {
         toast.success('Draft complete!');
         setTimerSeconds(null);
       } else if (message.type === 'timer_start') {
-        setTimerSeconds(message.seconds);
+        setTimerSeconds(message.timeLimit);
+        setTimeLimit(message.timeLimit);
+        setIsPaused(false);
+        setCurrentPickNumber(message.pickNumber);
       } else if (message.type === 'timer_tick') {
-        setTimerSeconds(message.remainingSeconds);
+        setTimerSeconds(message.remaining);
       } else if (message.type === 'timer_stop') {
         setTimerSeconds(null);
+        setIsPaused(false);
+      } else if (message.type === 'timer_pause') {
+        setIsPaused(true);
+      } else if (message.type === 'timer_resume') {
+        setIsPaused(false);
+        setTimerSeconds(message.remaining);
       } else if (message.type === 'auto_pick') {
         toast.warning(`Auto-picked ${message.assetName} for ${message.teamName}`);
         refetchRoster();
@@ -236,8 +252,25 @@ export default function Draft() {
             />
           </div>
 
-          {/* Recent Picks Sidebar */}
-          <div className="lg:col-span-1">
+          {/* Sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Draft Clock */}
+            {timerSeconds !== null && currentTurnTeamName && (
+              <DraftClock
+                pickNumber={currentPickNumber}
+                round={currentRound}
+                teamName={currentTurnTeamName}
+                isYourTurn={isMyTurn}
+                timeLimit={timeLimit}
+                remainingTime={timerSeconds}
+                isPaused={isPaused}
+                onTimerExpired={() => {
+                  toast.warning('Time expired! Auto-pick will be triggered.');
+                }}
+              />
+            )}
+
+            {/* Recent Picks */}
             <div className="bg-card border border-border rounded-lg p-4 sticky top-4">
               <h3 className="text-lg font-semibold text-foreground mb-4">
                 📄 Recent Picks
