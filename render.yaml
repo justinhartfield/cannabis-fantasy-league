@@ -1,0 +1,32 @@
+services:
+  # Web Service
+  - type: web
+    name: cannabis-fantasy-league
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cannabis-fantasy-league-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_URL
+        value: https://cannabis-fantasy-league.onrender.com
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM_EMAIL
+        sync: false
+    healthCheckPath: /api/health
+
+databases:
+  # MySQL Database
+  - name: cannabis-fantasy-league-db
+    databaseName: cannabis_fantasy_league
+    plan: free
+    region: oregon
