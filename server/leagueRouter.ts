@@ -103,9 +103,10 @@ export const leagueRouter = router({
         };
       } catch (error) {
         console.error("[LeagueRouter] Error creating league:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create league",
+          message: `Failed to create league: ${errorMessage}`,
         });
       }
     }),
