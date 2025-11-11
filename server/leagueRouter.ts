@@ -739,7 +739,7 @@ export const leagueRouter = router({
             name: teams.name,
             draftPosition: teams.draftPosition,
             userId: teams.userId,
-            userName: users.username,
+            userName: users.name,
           })
           .from(teams)
           .leftJoin(users, eq(teams.userId, users.id))
