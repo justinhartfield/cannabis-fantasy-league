@@ -51,19 +51,20 @@ export const leagueRouter = router({
       }
 
       try {
+        // TODO: Re-enable after leagueCode column is added to database
         // Generate unique league code
-        let leagueCode = generateLeagueCode();
-        let codeExists = true;
-        
-        // Ensure code is unique
-        while (codeExists) {
-          const existing = await db.select().from(leagues).where(eq(leagues.leagueCode, leagueCode)).limit(1);
-          if (existing.length === 0) {
-            codeExists = false;
-          } else {
-            leagueCode = generateLeagueCode();
-          }
-        }
+        // let leagueCode = generateLeagueCode();
+        // let codeExists = true;
+        // 
+        // // Ensure code is unique
+        // while (codeExists) {
+        //   const existing = await db.select().from(leagues).where(eq(leagues.leagueCode, leagueCode)).limit(1);
+        //   if (existing.length === 0) {
+        //     codeExists = false;
+        //   } else {
+        //     leagueCode = generateLeagueCode();
+        //   }
+        // }
 
         // Create league
         const currentYear = new Date().getFullYear();
