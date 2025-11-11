@@ -182,8 +182,8 @@ export default function Draft() {
     );
   }
 
-  // Calculate current pick
-  const currentPick = roster.length + 1;
+  // Use current pick from draft status (WebSocket state)
+  const currentPick = currentPickNumber || 1;
   
   // Check if it's the user's turn
   const isMyTurn = currentTurnTeamId === myTeam.id;
