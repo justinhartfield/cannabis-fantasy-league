@@ -8,6 +8,7 @@
 import { getMetabaseClient } from '../server/lib/metabase';
 import { getDb } from '../server/db';
 import { manufacturers, cannabisStrains, strains, pharmacies } from '../drizzle/schema';
+import { eq } from 'drizzle-orm';
 
 async function syncData() {
   console.log('🚀 Starting Metabase data sync...\n');
@@ -39,23 +40,32 @@ async function syncData() {
     
     for (const mfg of manufacturerData) {
       const productCount = productCountByManufacturer.get(mfg.name) || 0;
-      await db.insert(manufacturers).values({
-        name: mfg.name,
-        currentRank: mfg.rank_1d,
-        weeklyRank: mfg.rank_7d,
-        monthlyRank: mfg.rank_30d,
-        quarterlyRank: mfg.rank_90d,
-        productCount: productCount,
-      }).onConflictDoUpdate({
-        target: [manufacturers.name],
-        set: { 
-          productCount: productCount,
+      
+      // Check if manufacturer exists
+      const existing = await db.select().from(manufacturers).where(eq(manufacturers.name, mfg.name)).limit(1);
+      
+      if (existing.length > 0) {
+        // Update existing manufacturer
+        await db.update(manufacturers)
+          .set({
+            productCount: productCount,
+            currentRank: mfg.rank_1d,
+            weeklyRank: mfg.rank_7d,
+            monthlyRank: mfg.rank_30d,
+            quarterlyRank: mfg.rank_90d,
+          })
+          .where(eq(manufacturers.name, mfg.name));
+      } else {
+        // Insert new manufacturer
+        await db.insert(manufacturers).values({
+          name: mfg.name,
           currentRank: mfg.rank_1d,
           weeklyRank: mfg.rank_7d,
           monthlyRank: mfg.rank_30d,
           quarterlyRank: mfg.rank_90d,
-        }
-      });
+          productCount: productCount,
+        });
+      }
     }
     console.log(`✅ Synced ${manufacturerData.length} manufacturers\n`);
 
