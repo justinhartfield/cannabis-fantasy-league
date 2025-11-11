@@ -46,6 +46,21 @@ export default function Draft() {
     { enabled: !!id && isAuthenticated }
   );
 
+  const { data: draftStatus } = trpc.draft.getDraftStatus.useQuery(
+    { leagueId },
+    { enabled: !!id && isAuthenticated, refetchInterval: 5000 }
+  );
+
+  // Initialize current turn from draft status
+  useEffect(() => {
+    if (draftStatus?.nextPick) {
+      setCurrentTurnTeamId(draftStatus.nextPick.teamId);
+      setCurrentTurnTeamName(draftStatus.nextPick.teamName);
+      setCurrentPickNumber(draftStatus.nextPick.pickNumber);
+      setCurrentRound(draftStatus.nextPick.round);
+    }
+  }, [draftStatus]);
+
   // WebSocket connection for real-time draft updates
   const { isConnected, joinDraft, leaveDraft } = useWebSocket({
     userId: user?.id || 0,

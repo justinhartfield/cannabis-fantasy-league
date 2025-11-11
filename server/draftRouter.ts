@@ -487,4 +487,22 @@ export const draftRouter = router({
 
       return { success: true, teamCount: leagueTeams.length };
     }),
+
+  /**
+   * Get current draft status
+   */
+  getDraftStatus: protectedProcedure
+    .input(z.object({ leagueId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const status = await getDraftStatus(input.leagueId);
+      const nextPick = await calculateNextPick(input.leagueId).catch(() => null);
+
+      return {
+        ...status,
+        nextPick,
+      };
+    }),
 });
