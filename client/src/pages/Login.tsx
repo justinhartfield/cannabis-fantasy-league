@@ -40,8 +40,8 @@ export default function Login() {
 
       const data = await response.json();
       
-      // Redirect to the page they were trying to access, or dashboard
-      const redirectTo = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
+      // Redirect to the page they were trying to access, or home
+      const redirectTo = new URLSearchParams(window.location.search).get('redirect') || '/';
       setLocation(redirectTo);
     } catch (err) {
       setError('Login failed. Please try again.');
