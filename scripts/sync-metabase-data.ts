@@ -21,23 +21,39 @@ async function syncData() {
   }
 
   try {
-    // 1. Sync Manufacturers (Brands)
+    // 1. First fetch products to calculate manufacturer product counts
+    console.log('💊 Fetching product strains for counting...');
+    const strainData = await metabase.fetchStrains();
+    
+    // Count products per manufacturer
+    const productCountByManufacturer = new Map<string, number>();
+    for (const strain of strainData) {
+      const count = productCountByManufacturer.get(strain.manufacturer) || 0;
+      productCountByManufacturer.set(strain.manufacturer, count + 1);
+    }
+    console.log(`📊 Calculated product counts for ${productCountByManufacturer.size} manufacturers\n`);
+
+    // 2. Sync Manufacturers (Brands) with correct product counts
     console.log('📦 Syncing manufacturers...');
     const manufacturerData = await metabase.fetchManufacturers();
     
     for (const mfg of manufacturerData) {
+      const productCount = productCountByManufacturer.get(mfg.name) || 0;
       await db.insert(manufacturers).values({
         name: mfg.name,
         currentRank: mfg.rank_1d,
         weeklyRank: mfg.rank_7d,
         monthlyRank: mfg.rank_30d,
         quarterlyRank: mfg.rank_90d,
-        productCount: mfg.product_count,
-      }).onConflictDoNothing();
+        productCount: productCount,
+      }).onConflictDoUpdate({
+        target: manufacturers.name,
+        set: { productCount: productCount }
+      });
     }
     console.log(`✅ Synced ${manufacturerData.length} manufacturers\n`);
 
-    // 2. Sync Cannabis Strains (Genetics/Cultivars)
+    // 3. Sync Cannabis Strains (Genetics/Cultivars)
     console.log('🌿 Syncing cannabis strains...');
     const cannabisStrainData = await metabase.fetchCannabisStrains();
     
@@ -59,9 +75,9 @@ async function syncData() {
     }
     console.log(`✅ Synced ${cannabisStrainData.length} cannabis strains\n`);
 
-    // 3. Sync Strains (Products)
+    // 4. Sync Strains (Products) - already fetched above
     console.log('💊 Syncing product strains...');
-    const strainData = await metabase.fetchStrains();
+    // strainData already fetched above for counting
     
     for (const strain of strainData) {
       await db.insert(strains).values({
@@ -79,7 +95,7 @@ async function syncData() {
     }
     console.log(`✅ Synced ${strainData.length} product strains\n`);
 
-    // 4. Sync Pharmacies
+    // 5. Sync Pharmacies
     console.log('🏥 Syncing pharmacies...');
     const pharmacyData = await metabase.fetchPharmacies();
     
