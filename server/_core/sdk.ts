@@ -3,6 +3,11 @@ import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
+
+// Extend Request type to include cookies from cookie-parser
+interface RequestWithCookies extends Request {
+  cookies: { [key: string]: string };
+}
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
@@ -259,7 +264,7 @@ class SDKServer {
   async authenticateRequest(req: Request): Promise<User> {
     // Regular authentication flow
     // Use parsed cookies from cookie-parser middleware (same as REST endpoints)
-    const sessionCookie = (req as any).cookies[COOKIE_NAME];
+    const sessionCookie = (req as RequestWithCookies).cookies[COOKIE_NAME];
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
