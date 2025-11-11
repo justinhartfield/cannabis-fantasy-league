@@ -47,8 +47,14 @@ async function syncData() {
         quarterlyRank: mfg.rank_90d,
         productCount: productCount,
       }).onConflictDoUpdate({
-        target: manufacturers.name,
-        set: { productCount: productCount }
+        target: [manufacturers.name],
+        set: { 
+          productCount: productCount,
+          currentRank: mfg.rank_1d,
+          weeklyRank: mfg.rank_7d,
+          monthlyRank: mfg.rank_30d,
+          quarterlyRank: mfg.rank_90d,
+        }
       });
     }
     console.log(`✅ Synced ${manufacturerData.length} manufacturers\n`);
