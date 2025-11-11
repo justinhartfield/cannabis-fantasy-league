@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { manufacturers, cannabisStrains, strains, pharmacies, rosters, teams, draftPicks } from "../drizzle/schema";
-import { eq, and, notInArray, sql } from "drizzle-orm";
+import { eq, and, notInArray, inArray, sql } from "drizzle-orm";
 import { advanceDraftPick, calculateNextPick } from "./draftLogic";
 import { wsManager } from "./websocket";
 
@@ -61,7 +61,7 @@ export async function makeAutoPick(leagueId: number, teamId: number): Promise<vo
         .from(rosters)
         .where(
           and(
-            sql`${rosters.teamId} IN (${teamIds.join(",")})`,
+            inArray(rosters.teamId, teamIds),
             eq(rosters.assetType, targetPosition)
           )
         )

@@ -370,7 +370,7 @@ export const draftRouter = router({
         .select()
         .from(rosters)
         .where(
-          sql`${rosters.teamId} IN (${allTeams.map((t) => t.id).join(",")})`
+          inArray(rosters.teamId, allTeams.map((t) => t.id))
         );
 
       const expectedPicks = allTeams.length * 9; // 9 picks per team
