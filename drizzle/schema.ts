@@ -1,4 +1,4 @@
-import { pgTable, mysqlSchema, AnyMySqlColumn, primaryKey, int, varchar, text, timestamp, index, unique, varchar, json, tinyint, decimal } from "drizzle-orm/pg-core"
+import { pgTable, serial, integer, varchar, text, timestamp, json, index, primaryKey, unique, decimal } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const achievements = pgTable("achievements", {
