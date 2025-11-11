@@ -11,7 +11,6 @@ export const achievements = pgTable("achievements", {
 	earnedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "achievements_id"}),
 ]);
 
 export const cannabisStrainWeeklyStats = pgTable("cannabisStrainWeeklyStats", {
@@ -29,9 +28,8 @@ export const cannabisStrainWeeklyStats = pgTable("cannabisStrainWeeklyStats", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("week_idx").on(table.year, table.week),
-	primaryKey({ columns: [table.id], name: "cannabisStrainWeeklyStats_id"}),
-	unique("cannabis_strain_week_idx").on(table.cannabisStrainId, table.year, table.week),
+	index("cannabis_strain_week_idx").on(table.year, table.week),
+	unique("cannabis_strain_week_unique").on(table.cannabisStrainId, table.year, table.week),
 ]);
 
 export const cannabisStrains = pgTable("cannabisStrains", {
@@ -52,9 +50,8 @@ export const cannabisStrains = pgTable("cannabisStrains", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("name_idx").on(table.name),
-	index("slug_idx").on(table.slug),
-	primaryKey({ columns: [table.id], name: "cannabisStrains_id"}),
+	index("cannabis_strains_name_idx").on(table.name),
+	index("cannabis_strains_slug_idx").on(table.slug),
 	unique("cannabisStrains_metabaseId_unique").on(table.metabaseId),
 	unique("cannabisStrains_slug_unique").on(table.slug),
 ]);
@@ -69,7 +66,6 @@ export const challengeParticipants = pgTable("challengeParticipants", {
 	joinedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "challengeParticipants_id"}),
 	unique("challenge_user_idx").on(table.challengeId, table.userId),
 ]);
 
@@ -85,7 +81,6 @@ export const challengeRosters = pgTable("challengeRosters", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "challengeRosters_id"}),
 	unique("challenge_user_asset_idx").on(table.challengeId, table.userId, table.assetType, table.assetId),
 ]);
 
@@ -103,7 +98,6 @@ export const challenges = pgTable("challenges", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "challenges_id"}),
 ]);
 
 export const draftPicks = pgTable("draftPicks", {
@@ -117,7 +111,6 @@ export const draftPicks = pgTable("draftPicks", {
 	pickTime: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "draftPicks_id"}),
 	unique("league_pick_idx").on(table.leagueId, table.pickNumber),
 ]);
 
@@ -130,7 +123,6 @@ export const leagueMessages = pgTable("leagueMessages", {
 },
 (table) => [
 	index("league_time_idx").on(table.leagueId, table.createdAt),
-	primaryKey({ columns: [table.id], name: "leagueMessages_id"}),
 ]);
 
 export const leagues = pgTable("leagues", {
@@ -156,7 +148,6 @@ export const leagues = pgTable("leagues", {
 	draftPickTimeLimit: integer().default(120),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "leagues_id"}),
 ]);
 
 export const manufacturerWeeklyStats = pgTable("manufacturerWeeklyStats", {
@@ -173,9 +164,8 @@ export const manufacturerWeeklyStats = pgTable("manufacturerWeeklyStats", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("week_idx").on(table.year, table.week),
-	primaryKey({ columns: [table.id], name: "manufacturerWeeklyStats_id"}),
-	unique("manufacturer_week_idx").on(table.manufacturerId, table.year, table.week),
+	index("manufacturer_week_idx").on(table.year, table.week),
+	unique("manufacturer_week_unique").on(table.manufacturerId, table.year, table.week),
 ]);
 
 export const manufacturers = pgTable("manufacturers", {
@@ -190,8 +180,7 @@ export const manufacturers = pgTable("manufacturers", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("name_idx").on(table.name),
-	primaryKey({ columns: [table.id], name: "manufacturers_id"}),
+	index("manufacturers_name_idx").on(table.name),
 	unique("manufacturers_name_unique").on(table.name),
 ]);
 
@@ -211,7 +200,6 @@ export const matchups = pgTable("matchups", {
 },
 (table) => [
 	index("league_week_idx").on(table.leagueId, table.year, table.week),
-	primaryKey({ columns: [table.id], name: "matchups_id"}),
 ]);
 
 export const pharmacies = pgTable("pharmacies", {
@@ -229,8 +217,7 @@ export const pharmacies = pgTable("pharmacies", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("name_idx").on(table.name),
-	primaryKey({ columns: [table.id], name: "pharmacies_id"}),
+	index("pharmacies_name_idx").on(table.name),
 	unique("pharmacies_name_unique").on(table.name),
 ]);
 
@@ -250,9 +237,8 @@ export const pharmacyWeeklyStats = pgTable("pharmacyWeeklyStats", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("week_idx").on(table.year, table.week),
-	primaryKey({ columns: [table.id], name: "pharmacyWeeklyStats_id"}),
-	unique("pharmacy_week_idx").on(table.pharmacyId, table.year, table.week),
+	index("pharmacy_week_idx").on(table.year, table.week),
+	unique("pharmacy_week_unique").on(table.pharmacyId, table.year, table.week),
 ]);
 
 export const rosters = pgTable("rosters", {
@@ -265,7 +251,6 @@ export const rosters = pgTable("rosters", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "rosters_id"}),
 	unique("team_asset_idx").on(table.teamId, table.assetType, table.assetId),
 ]);
 
@@ -280,7 +265,6 @@ export const scoringBreakdowns = pgTable("scoringBreakdowns", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "scoringBreakdowns_id"}),
 ]);
 
 export const strainWeeklyStats = pgTable("strainWeeklyStats", {
@@ -299,9 +283,8 @@ export const strainWeeklyStats = pgTable("strainWeeklyStats", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("week_idx").on(table.year, table.week),
-	primaryKey({ columns: [table.id], name: "strainWeeklyStats_id"}),
-	unique("strain_week_idx").on(table.strainId, table.year, table.week),
+	index("strain_week_idx").on(table.year, table.week),
+	unique("strain_week_unique").on(table.strainId, table.year, table.week),
 ]);
 
 export const strains = pgTable("strains", {
@@ -325,9 +308,8 @@ export const strains = pgTable("strains", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	index("name_idx").on(table.name),
-	index("manufacturer_idx").on(table.manufacturerId),
-	primaryKey({ columns: [table.id], name: "strains_id"}),
+	index("strains_name_idx").on(table.name),
+	index("strains_manufacturer_idx").on(table.manufacturerId),
 	unique("strains_metabaseId_unique").on(table.metabaseId),
 ]);
 
@@ -348,7 +330,6 @@ export const teams = pgTable("teams", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "teams_id"}),
 	unique("league_user_idx").on(table.leagueId, table.userId),
 ]);
 
@@ -366,7 +347,6 @@ export const trades = pgTable("trades", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "trades_id"}),
 ]);
 
 export const users = pgTable("users", {
@@ -381,7 +361,6 @@ export const users = pgTable("users", {
 	lastSignedIn: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "users_id"}),
 	unique("users_openId_unique").on(table.openId),
 ]);
 
@@ -402,7 +381,6 @@ export const waiverClaims = pgTable("waiverClaims", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "waiverClaims_id"}),
 ]);
 
 export const weeklyLineups = pgTable("weeklyLineups", {
@@ -426,8 +404,7 @@ export const weeklyLineups = pgTable("weeklyLineups", {
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "weeklyLineups_id"}),
-	unique("team_week_idx").on(table.teamId, table.year, table.week),
+	unique("weekly_lineups_team_week_unique").on(table.teamId, table.year, table.week),
 ]);
 
 export const weeklyTeamScores = pgTable("weeklyTeamScores", {
@@ -450,6 +427,5 @@ export const weeklyTeamScores = pgTable("weeklyTeamScores", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
 (table) => [
-	primaryKey({ columns: [table.id], name: "weeklyTeamScores_id"}),
-	unique("team_week_idx").on(table.teamId, table.year, table.week),
+	unique("weekly_team_scores_team_week_unique").on(table.teamId, table.year, table.week),
 ]);
