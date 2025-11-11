@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, notInArray, sql } from "drizzle-orm";
+import { eq, and, notInArray, inArray, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { manufacturers, cannabisStrains, strains, pharmacies, rosters, leagues, teams, draftPicks } from "../drizzle/schema";
@@ -46,7 +46,7 @@ export const draftRouter = router({
             .from(rosters)
             .where(
               and(
-                sql`${rosters.teamId} IN (${teamIds.join(",")})`,
+                inArray(rosters.teamId, teamIds),
                 eq(rosters.assetType, "manufacturer")
               )
             )
@@ -105,7 +105,7 @@ export const draftRouter = router({
             .from(rosters)
             .where(
               and(
-                sql`${rosters.teamId} IN (${teamIds.join(",")})`,
+                inArray(rosters.teamId, teamIds),
                 eq(rosters.assetType, "cannabis_strain")
               )
             )
@@ -166,7 +166,7 @@ export const draftRouter = router({
             .from(rosters)
             .where(
               and(
-                sql`${rosters.teamId} IN (${teamIds.join(",")})`,
+                inArray(rosters.teamId, teamIds),
                 eq(rosters.assetType, "product")
               )
             )
@@ -228,7 +228,7 @@ export const draftRouter = router({
             .from(rosters)
             .where(
               and(
-                sql`${rosters.teamId} IN (${teamIds.join(",")})`,
+                inArray(rosters.teamId, teamIds),
                 eq(rosters.assetType, "pharmacy")
               )
             )
