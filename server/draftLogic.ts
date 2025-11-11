@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { leagues, teams, draftPicks } from "../drizzle/schema";
+import { leagues, teams, draftPicks, rosters } from "../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 /**
@@ -108,9 +108,10 @@ export async function validateDraftPick(
   }
 
   // Check if team has room for this asset type
-  const teamRoster = await db.query.rosters.findMany({
-    where: (rosters, { eq }) => eq(rosters.teamId, teamId),
-  });
+  const teamRoster = await db
+    .select()
+    .from(rosters)
+    .where(eq(rosters.teamId, teamId));
 
   const assetCounts = {
     manufacturer: 0,
