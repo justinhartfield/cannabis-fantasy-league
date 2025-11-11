@@ -6,6 +6,18 @@ import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 /**
+ * Generate a random 6-character alphanumeric league code
+ */
+function generateLeagueCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude similar-looking characters
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
  * League Router
  * Handles all league management operations for Season Mode
  */
@@ -39,12 +51,27 @@ export const leagueRouter = router({
       }
 
       try {
+        // Generate unique league code
+        let leagueCode = generateLeagueCode();
+        let codeExists = true;
+        
+        // Ensure code is unique
+        while (codeExists) {
+          const existing = await db.select().from(leagues).where(eq(leagues.leagueCode, leagueCode)).limit(1);
+          if (existing.length === 0) {
+            codeExists = false;
+          } else {
+            leagueCode = generateLeagueCode();
+          }
+        }
+
         // Create league
         const currentYear = new Date().getFullYear();
         const leagueResult = await db
           .insert(leagues)
           .values({
             name: input.name,
+            leagueCode: leagueCode,
             commissionerUserId: ctx.user.id,
             teamCount: input.maxTeams,
             currentWeek: 1,

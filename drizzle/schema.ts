@@ -128,6 +128,7 @@ export const leagueMessages = pgTable("leagueMessages", {
 export const leagues = pgTable("leagues", {
 	id: serial().notNull(),
 	name: varchar({ length: 255 }).notNull(),
+	leagueCode: varchar({ length: 10 }),
 	commissionerUserId: integer().notNull(),
 	teamCount: integer().default(10).notNull(),
 	draftType: varchar({ length: 50 }).default('snake').notNull(),
@@ -148,6 +149,7 @@ export const leagues = pgTable("leagues", {
 	draftPickTimeLimit: integer().default(120),
 },
 (table) => [
+	unique("leagues_leagueCode_unique").on(table.leagueCode),
 ]);
 
 export const manufacturerWeeklyStats = pgTable("manufacturerWeeklyStats", {
