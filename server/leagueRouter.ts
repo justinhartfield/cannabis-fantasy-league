@@ -67,11 +67,11 @@ export const leagueRouter = router({
 
         // Create league
         const currentYear = new Date().getFullYear();
+        
         const leagueResult = await db
           .insert(leagues)
           .values({
             name: input.name,
-            leagueCode: leagueCode,
             commissionerUserId: ctx.user.id,
             teamCount: input.maxTeams,
             currentWeek: 1,
@@ -80,6 +80,8 @@ export const leagueRouter = router({
             scoringType: input.scoringSystem === "standard" ? "standard" : "custom",
             playoffTeams: input.playoffTeams,
             seasonYear: currentYear,
+            // TODO: Add leagueCode after column is added to database
+            // leagueCode: leagueCode,
           })
           .returning({ id: leagues.id });
 
