@@ -246,6 +246,27 @@ export default function LeagueDetail() {
               </CardContent>
             </Card>
 
+            {/* Draft Actions for Members */}
+            {!isCommissioner && userTeam && league.draftStarted && !league.draftCompleted && (
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="text-card-foreground">Draft</CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Der Draft läuft gerade
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    className="w-full"
+                    onClick={() => setLocation(`/league/${league.id}/draft`)}
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Zum Draft
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Commissioner Actions */}
             {isCommissioner && (
               <Card className="bg-card border-border">
