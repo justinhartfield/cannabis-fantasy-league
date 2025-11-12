@@ -22,52 +22,61 @@ async function syncData() {
   }
 
   try {
-    // 1. First fetch products to calculate manufacturer product counts
+    // 1. First fetch products to get manufacturer names and calculate counts
     console.log('💊 Fetching product strains for counting...');
     const strainData = await metabase.fetchStrains();
     
-    // Count products per manufacturer
-    const productCountByManufacturer = new Map<string, number>();
-    for (const strain of strainData) {
-      const count = productCountByManufacturer.get(strain.manufacturer) || 0;
-      productCountByManufacturer.set(strain.manufacturer, count + 1);
-    }
-    console.log(`📊 Calculated product counts for ${productCountByManufacturer.size} manufacturers\n`);
-
-    // 2. Sync Manufacturers (Brands) with correct product counts
-    console.log('📦 Syncing manufacturers...');
-    const manufacturerData = await metabase.fetchManufacturers();
+    // Count products per manufacturer and collect unique manufacturers
+    const manufacturerStats = new Map<string, {
+      productCount: number;
+      totalFavorites: number;
+    }>();
     
-    for (const mfg of manufacturerData) {
-      const productCount = productCountByManufacturer.get(mfg.name) || 0;
+    for (const strain of strainData) {
+      const stats = manufacturerStats.get(strain.manufacturer) || { productCount: 0, totalFavorites: 0 };
+      stats.productCount++;
+      stats.totalFavorites += strain.favorite_count;
+      manufacturerStats.set(strain.manufacturer, stats);
+    }
+    console.log(`📊 Found ${manufacturerStats.size} unique manufacturers from product data\n`);
+
+    // 2. Sync Manufacturers from the actual product data (not BRAND table)
+    console.log('📦 Syncing manufacturers from product data...');
+    
+    let syncedCount = 0;
+    for (const [manufacturerName, stats] of manufacturerStats.entries()) {
+      // Skip "Unknown" manufacturers
+      if (manufacturerName === 'Unknown') continue;
       
       // Check if manufacturer exists
-      const existing = await db.select().from(manufacturers).where(eq(manufacturers.name, mfg.name)).limit(1);
+      const existing = await db.select().from(manufacturers).where(eq(manufacturers.name, manufacturerName)).limit(1);
       
       if (existing.length > 0) {
         // Update existing manufacturer
         await db.update(manufacturers)
           .set({
-            productCount: productCount,
-            currentRank: mfg.rank_1d,
-            weeklyRank: mfg.rank_7d,
-            monthlyRank: mfg.rank_30d,
-            quarterlyRank: mfg.rank_90d,
+            productCount: stats.productCount,
+            // Use total favorites as a proxy for ranking (higher favorites = better rank)
+            currentRank: null, // Will be calculated later based on actual stats
+            weeklyRank: null,
+            monthlyRank: null,
+            quarterlyRank: null,
           })
-          .where(eq(manufacturers.name, mfg.name));
+          .where(eq(manufacturers.name, manufacturerName));
       } else {
         // Insert new manufacturer
         await db.insert(manufacturers).values({
-          name: mfg.name,
-          currentRank: mfg.rank_1d,
-          weeklyRank: mfg.rank_7d,
-          monthlyRank: mfg.rank_30d,
-          quarterlyRank: mfg.rank_90d,
-          productCount: productCount,
+          name: manufacturerName,
+          currentRank: null,
+          weeklyRank: null,
+          monthlyRank: null,
+          quarterlyRank: null,
+          productCount: stats.productCount,
         });
       }
+      syncedCount++;
     }
-    console.log(`✅ Synced ${manufacturerData.length} manufacturers\n`);
+    console.log(`✅ Synced ${syncedCount} manufacturers with product counts\n`);
 
     // 3. Sync Cannabis Strains (Genetics/Cultivars)
     console.log('🌿 Syncing cannabis strains...');
