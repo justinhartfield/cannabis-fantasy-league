@@ -38,8 +38,8 @@ interface TeamScore {
  * - Historical scoring trends
  */
 export default function Scoring() {
-  const params = useParams();
-  const leagueId = parseInt(params.id as string);
+  const { id } = useParams();
+  const leagueId = parseInt(id!);
   const { user } = useAuth();
   
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
