@@ -49,7 +49,7 @@ export default function Scoring() {
   const [isCalculating, setIsCalculating] = useState(false);
 
   // Fetch league data
-  const { data: league } = trpc.league.getById.useQuery({ id: leagueId });
+  const { data: league } = trpc.league.getById.useQuery({ leagueId: leagueId });
   
   // Fetch team scores for selected week
   const { data: weekScores, refetch: refetchScores } = trpc.scoring.getLeagueWeekScores.useQuery({
