@@ -27,6 +27,13 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'lucide': ['lucide-react'],
+        },
+      },
+    },
   },
   server: {
     host: true,
