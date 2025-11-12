@@ -13,6 +13,48 @@ export const achievements = pgTable("achievements", {
 (table) => [
 ]);
 
+export const brands = pgTable("brands", {
+	id: serial().notNull(),
+	name: varchar({ length: 255 }).notNull(),
+	slug: varchar({ length: 255 }),
+	description: text(),
+	logoUrl: varchar({ length: 500 }),
+	websiteUrl: varchar({ length: 500 }),
+	totalFavorites: integer().default(0).notNull(),
+	totalViews: integer().default(0).notNull(),
+	totalComments: integer().default(0).notNull(),
+	affiliateClicks: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("brands_name_idx").on(table.name),
+	unique("brands_name_unique").on(table.name),
+]);
+
+export const brandWeeklyStats = pgTable("brandWeeklyStats", {
+	id: serial().notNull(),
+	brandId: integer().notNull(),
+	year: integer().notNull(),
+	week: integer().notNull(),
+	favorites: integer().default(0).notNull(),
+	favoriteGrowth: integer().default(0).notNull(),
+	views: integer().default(0).notNull(),
+	viewGrowth: integer().default(0).notNull(),
+	comments: integer().default(0).notNull(),
+	commentGrowth: integer().default(0).notNull(),
+	affiliateClicks: integer().default(0).notNull(),
+	clickGrowth: integer().default(0).notNull(),
+	engagementRate: integer().default(0).notNull(),
+	sentimentScore: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("brand_week_idx").on(table.year, table.week),
+	unique("brand_week_unique").on(table.brandId, table.year, table.week),
+]);
+
 export const cannabisStrainWeeklyStats = pgTable("cannabisStrainWeeklyStats", {
 	id: serial().notNull(),
 	cannabisStrainId: integer().notNull(),
