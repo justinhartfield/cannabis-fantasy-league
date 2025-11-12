@@ -183,13 +183,13 @@ export default function CreateLeague() {
                 Roster-Struktur
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Jedes Team hat 9 Roster-Plätze
+                Jedes Team hat 10 Roster-Plätze
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Der Draft besteht aus <strong>9 Runden</strong>. Jedes Team wählt folgende Positionen:
+                  Der Draft besteht aus <strong>10 Runden</strong>. Jedes Team wählt folgende Positionen:
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
@@ -226,6 +226,15 @@ export default function CreateLeague() {
                     <div>
                       <div className="text-sm font-medium">Apotheken</div>
                       <div className="text-xs text-muted-foreground">PHM</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                    <div className="w-8 h-8 rounded bg-yellow-500/10 flex items-center justify-center">
+                      <span className="text-xs font-bold text-yellow-600">1×</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">Marken</div>
+                      <div className="text-xs text-muted-foreground">BRD</div>
                     </div>
                   </div>
                 </div>
