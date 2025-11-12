@@ -17,6 +17,7 @@ interface LeagueNavProps {
  * LeagueNav Component
  * 
  * Reusable navigation header for all league pages
+ * Updated: 2025-11-12
  */
 export default function LeagueNav({
   leagueId,
