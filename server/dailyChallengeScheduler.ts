@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import { CronJob } from 'cron';
 import { getDb } from './db';
 import { leagues, teams, users } from '../drizzle/schema';
 import { eq, and } from 'drizzle-orm';
@@ -156,17 +156,19 @@ export function initDailyChallengeScheduler() {
 
   // Create new daily challenge at 8:00 AM CET (7:00 AM UTC in winter, 6:00 AM UTC in summer)
   // Using 7:00 AM UTC for simplicity
-  cron.schedule('0 7 * * *', async () => {
+  const createChallengeJob = new CronJob('0 7 * * *', async () => {
     console.log('[DailyChallengeScheduler] Running daily challenge creation...');
     await createDailyChallenge();
   });
+  createChallengeJob.start();
 
   // Send reminder emails at 4:20 PM CET (3:20 PM UTC in winter, 2:20 PM UTC in summer)
   // Using 3:20 PM UTC for simplicity
-  cron.schedule('20 15 * * *', async () => {
+  const reminderJob = new CronJob('20 15 * * *', async () => {
     console.log('[DailyChallengeScheduler] Running reminder emails...');
     await sendChallengeReminders();
   });
+  reminderJob.start();
 
   console.log('[DailyChallengeScheduler] Scheduled:');
   console.log('  - Daily challenge creation: 8:00 AM CET (7:00 AM UTC)');
