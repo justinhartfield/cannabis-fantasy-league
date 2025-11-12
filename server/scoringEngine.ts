@@ -22,6 +22,7 @@ import {
 } from '../drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { wsManager } from './websocket';
+import { getOrCreateLineup } from './utils/autoLineup';
 
 // ============================================================================
 // SCORING FORMULAS
@@ -590,23 +591,13 @@ export async function calculateTeamScore(teamId: number, year: number, week: num
     throw new Error('Database not available');
   }
 
-  // Get the team's lineup for this week
-  const lineup = await db
-    .select()
-    .from(weeklyLineups)
-    .where(and(
-      eq(weeklyLineups.teamId, teamId),
-      eq(weeklyLineups.year, year),
-      eq(weeklyLineups.week, week)
-    ))
-    .limit(1);
+  // Get or create the team's lineup for this week (auto-generates from roster if not set)
+  const teamLineup = await getOrCreateLineup(teamId, year, week);
 
-  if (lineup.length === 0) {
-    console.log(`[Scoring] No lineup found for team ${teamId}, ${year}-W${week}`);
+  if (!teamLineup) {
+    console.log(`[Scoring] No lineup available for team ${teamId}, ${year}-W${week} (no roster)`);
     return 0;
   }
-
-  const teamLineup = lineup[0];
 
   // Calculate points for each position (9 total)
   const positionPoints = {
