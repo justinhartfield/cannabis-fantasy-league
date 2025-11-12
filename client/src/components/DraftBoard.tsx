@@ -9,7 +9,7 @@ import { Search, TrendingUp, Leaf, Package, Building2, Users, ArrowUpDown } from
 import { toast } from "sonner";
 import { DraftAssetCard } from "@/components/DraftAssetCard";
 
-type AssetType = "manufacturer" | "cannabis_strain" | "product" | "pharmacy";
+type AssetType = "manufacturer" | "cannabis_strain" | "product" | "pharmacy" | "brand";
 
 interface DraftBoardProps {
   leagueId: number;
@@ -23,11 +23,12 @@ interface DraftBoardProps {
 /**
  * DraftBoard Component
  * 
- * Displays available assets for drafting with the new 9-player roster structure:
+ * Displays available assets for drafting with the new 10-player roster structure:
  * - 2 Manufacturers
  * - 2 Cannabis Strains (genetics/cultivars)
  * - 2 Products (pharmaceutical products)
  * - 2 Pharmacies
+ * - 1 Brand
  * - 1 Flex (any category)
  */
 export default function DraftBoard({
@@ -39,7 +40,7 @@ export default function DraftBoard({
   onDraftPick,
 }: DraftBoardProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<AssetType | "all">("all");
+  const [selectedCategory, setSelectedCategory] = useState<AssetType | "all" | "brand">("all");
   const [sortBy, setSortBy] = useState<"name" | "stats">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -68,7 +69,13 @@ export default function DraftBoard({
     limit: 200,
   }, { enabled: selectedCategory === "all" || selectedCategory === "pharmacy" });
 
-  const isLoading = loadingMfg || loadingStrains || loadingProducts || loadingPharmacies;
+  const { data: brands = [], isLoading: loadingBrands } = trpc.draft.getAvailableBrands.useQuery({
+    leagueId,
+    search: searchQuery,
+    limit: 200,
+  }, { enabled: selectedCategory === "all" || selectedCategory === "brand" });
+
+  const isLoading = loadingMfg || loadingStrains || loadingProducts || loadingPharmacies || loadingBrands;
 
   // Calculate roster needs
   const rosterCounts = {
@@ -76,6 +83,7 @@ export default function DraftBoard({
     cannabis_strain: myRoster.filter((r) => r.assetType === "cannabis_strain").length,
     product: myRoster.filter((r) => r.assetType === "product").length,
     pharmacy: myRoster.filter((r) => r.assetType === "pharmacy").length,
+    brand: myRoster.filter((r) => r.assetType === "brand").length,
   };
 
   const rosterNeeds = {
@@ -83,7 +91,8 @@ export default function DraftBoard({
     cannabis_strain: Math.max(0, 2 - rosterCounts.cannabis_strain),
     product: Math.max(0, 2 - rosterCounts.product),
     pharmacy: Math.max(0, 2 - rosterCounts.pharmacy),
-    flex: Math.max(0, 1 - (myRoster.length - (rosterCounts.manufacturer + rosterCounts.cannabis_strain + rosterCounts.product + rosterCounts.pharmacy))),
+    brand: Math.max(0, 1 - rosterCounts.brand),
+    flex: Math.max(0, 1 - (myRoster.length - (rosterCounts.manufacturer + rosterCounts.cannabis_strain + rosterCounts.product + rosterCounts.pharmacy + rosterCounts.brand))),
   };
 
   // Sorting helper function
@@ -133,7 +142,7 @@ export default function DraftBoard({
         </CardHeader>
         <CardContent>
           {/* Roster Needs */}
-          <div className="grid grid-cols-5 gap-2 mb-4">
+          <div className="grid grid-cols-6 gap-2 mb-4">
             <div className="text-center p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <Building2 className="w-4 h-4 mx-auto mb-1 text-blue-500" />
               <p className="text-xs text-muted-foreground">Hersteller</p>
@@ -153,6 +162,11 @@ export default function DraftBoard({
               <Building2 className="w-4 h-4 mx-auto mb-1 text-green-500" />
               <p className="text-xs text-muted-foreground">Apotheken</p>
               <p className="text-lg font-bold text-foreground">{rosterNeeds.pharmacy}/2</p>
+            </div>
+            <div className="text-center p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <Building2 className="w-4 h-4 mx-auto mb-1 text-yellow-500" />
+              <p className="text-xs text-muted-foreground">Brands</p>
+              <p className="text-lg font-bold text-foreground">{rosterNeeds.brand || 0}/1</p>
             </div>
             <div className="text-center p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
               <Users className="w-4 h-4 mx-auto mb-1 text-orange-500" />
@@ -208,12 +222,13 @@ export default function DraftBoard({
         </CardHeader>
         <CardContent>
           <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
-            <TabsList className="grid grid-cols-5 w-full">
+            <TabsList className="grid grid-cols-6 w-full">
               <TabsTrigger value="all">Alle</TabsTrigger>
               <TabsTrigger value="manufacturer">Hersteller</TabsTrigger>
               <TabsTrigger value="cannabis_strain">Strains</TabsTrigger>
               <TabsTrigger value="product">Produkte</TabsTrigger>
               <TabsTrigger value="pharmacy">Apotheken</TabsTrigger>
+              <TabsTrigger value="brand">Brands</TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="space-y-2 mt-4">
@@ -287,6 +302,31 @@ export default function DraftBoard({
                           ]}
                           isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "product" && r.assetId === product.id)}
+                          remainingTime={remainingTime}
+                          onDraft={handleDraft}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Brands */}
+                  {brands.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                        <Building2 className="w-4 h-4" /> Brands ({brands.length})
+                      </h4>
+                      {sortAssets(brands).slice(0, 10).map((brand) => (
+                        <DraftAssetCard
+                          key={`brand-${brand.id}`}
+                          assetType="brand"
+                          assetId={brand.id}
+                          assetName={brand.name}
+                          stats={[
+                            { label: "Favorites", value: brand.totalFavorites || 0 },
+                            { label: "Views", value: brand.totalViews || 0 },
+                          ]}
+                          isMyTurn={isMyTurn}
+                          isInMyRoster={myRoster.some(r => r.assetType === "brand" && r.assetId === brand.id)}
                           remainingTime={remainingTime}
                           onDraft={handleDraft}
                         />
@@ -417,6 +457,31 @@ export default function DraftBoard({
                 ))
               )}
             </TabsContent>
+
+            <TabsContent value="brand" className="space-y-2 mt-4">
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Lädt...</p>
+              ) : brands.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Keine Brands gefunden</p>
+              ) : (
+                sortAssets(brands).map((brand) => (
+                  <DraftAssetCard
+                    key={brand.id}
+                    assetType="brand"
+                    assetId={brand.id}
+                    assetName={brand.name}
+                    stats={[
+                      { label: "Favorites", value: brand.totalFavorites || 0 },
+                      { label: "Views", value: brand.totalViews || 0 },
+                    ]}
+                    isMyTurn={isMyTurn}
+                    isInMyRoster={myRoster.some(r => r.assetType === "brand" && r.assetId === brand.id)}
+                    remainingTime={remainingTime}
+                    onDraft={handleDraft}
+                  />
+                ))
+              )}
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
@@ -453,6 +518,8 @@ function DraftAssetCard({
         return <Package className="w-5 h-5 text-pink-500" />;
       case "pharmacy":
         return <Building2 className="w-5 h-5 text-green-500" />;
+      case "brand":
+        return <Building2 className="w-5 h-5 text-yellow-500" />;
     }
   };
 

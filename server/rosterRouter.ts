@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { rosters, manufacturers, cannabisStrains, strains, pharmacies } from "../drizzle/schema";
+import { rosters, manufacturers, cannabisStrains, strains, pharmacies, brands } from "../drizzle/schema";
 
 /**
  * Roster Router
@@ -74,6 +74,15 @@ export const rosterRouter = router({
               assetDetails = phm;
               break;
             }
+            case "brand": {
+              const [brand] = await db
+                .select()
+                .from(brands)
+                .where(eq(brands.id, entry.assetId))
+                .limit(1);
+              assetDetails = brand;
+              break;
+            }
           }
 
           return {
@@ -118,6 +127,7 @@ export const rosterRouter = router({
         cannabis_strain: 0,
         product: 0,
         pharmacy: 0,
+        brand: 0,
       };
 
       rosterEntries.forEach((entry) => {
@@ -131,6 +141,7 @@ export const rosterRouter = router({
         cannabis_strain: { current: counts.cannabis_strain, max: 2 },
         product: { current: counts.product, max: 2 },
         pharmacy: { current: counts.pharmacy, max: 2 },
+        brand: { current: counts.brand, max: 1 },
         flex: { current: 0, max: 1 }, // TODO: Calculate flex from lineup
       };
     }),
@@ -142,7 +153,7 @@ export const rosterRouter = router({
     .input(
       z.object({
         teamId: z.number(),
-        assetType: z.enum(["manufacturer", "cannabis_strain", "product", "pharmacy"]),
+        assetType: z.enum(["manufacturer", "cannabis_strain", "product", "pharmacy", "brand"]),
         assetId: z.number(),
         acquiredWeek: z.number(),
         acquiredVia: z.enum(["draft", "waiver", "trade", "free_agent"]),
@@ -254,6 +265,15 @@ export const rosterRouter = router({
                 .where(eq(pharmacies.id, entry.assetId))
                 .limit(1);
               assetDetails = phm;
+              break;
+            }
+            case "brand": {
+              const [brand] = await db
+                .select()
+                .from(brands)
+                .where(eq(brands.id, entry.assetId))
+                .limit(1);
+              assetDetails = brand;
               break;
             }
           }

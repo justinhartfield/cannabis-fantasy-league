@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, and, notInArray, inArray, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { manufacturers, cannabisStrains, strains, pharmacies, rosters, leagues, teams, draftPicks } from "../drizzle/schema";
+import { manufacturers, cannabisStrains, strains, pharmacies, brands, rosters, leagues, teams, draftPicks } from "../drizzle/schema";
 import { wsManager } from "./websocket";
 import { validateDraftPick, advanceDraftPick, calculateNextPick, getDraftStatus } from "./draftLogic";
 import { draftTimerManager } from "./draftTimer";
@@ -258,6 +258,66 @@ export const draftRouter = router({
     }),
 
   /**
+   * Get available brands for drafting
+   */
+  getAvailableBrands: protectedProcedure
+    .input(
+      z.object({
+        leagueId: z.number(),
+        search: z.string().optional(),
+        limit: z.number().default(200),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      // Get all team IDs in the league
+      const leagueTeams = await db
+        .select({ teamId: teams.id })
+        .from(teams)
+        .where(eq(teams.leagueId, input.leagueId));
+
+      const teamIds = leagueTeams.map((t) => t.teamId);
+
+      // Get already drafted brands
+      const draftedBrands = teamIds.length > 0
+        ? await db
+            .select({ assetId: rosters.assetId })
+            .from(rosters)
+            .where(
+              and(
+                inArray(rosters.teamId, teamIds),
+                eq(rosters.assetType, "brand")
+              )
+            )
+        : [];
+
+      const draftedIds = draftedBrands.map((r) => r.assetId);
+
+      // Get available brands
+      let query = db.select().from(brands);
+
+      if (draftedIds.length > 0) {
+        query = query.where(notInArray(brands.id, draftedIds)) as any;
+      }
+
+      if (input.search) {
+        query = query.where(sql`${brands.name} LIKE ${`%${input.search}%`}`) as any;
+      }
+
+      const available = await query.limit(input.limit);
+
+      return available.map((brand) => ({
+        id: brand.id,
+        name: brand.name,
+        totalFavorites: brand.totalFavorites || 0,
+        totalViews: brand.totalViews || 0,
+        // TODO: Add more stats
+      }));
+    }),
+
+  /**
    * Make a draft pick
    */
   makeDraftPick: protectedProcedure
@@ -265,7 +325,7 @@ export const draftRouter = router({
       z.object({
         leagueId: z.number(),
         teamId: z.number(),
-        assetType: z.enum(["manufacturer", "cannabis_strain", "product", "pharmacy"]),
+        assetType: z.enum(["manufacturer", "cannabis_strain", "product", "pharmacy", "brand"]),
         assetId: z.number(),
         draftRound: z.number().optional(),
         draftPick: z.number().optional(),

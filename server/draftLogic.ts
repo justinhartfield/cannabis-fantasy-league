@@ -80,7 +80,7 @@ export async function isTeamsTurn(leagueId: number, teamId: number): Promise<boo
 export async function validateDraftPick(
   leagueId: number,
   teamId: number,
-  assetType: "manufacturer" | "cannabis_strain" | "product" | "pharmacy",
+  assetType: "manufacturer" | "cannabis_strain" | "product" | "pharmacy" | "brand",
   assetId: number
 ): Promise<{ valid: boolean; error?: string }> {
   const db = await getDb();
@@ -120,6 +120,7 @@ export async function validateDraftPick(
     cannabis_strain: 0,
     product: 0,
     pharmacy: 0,
+    brand: 0,
   };
 
   for (const item of teamRoster) {
@@ -128,18 +129,19 @@ export async function validateDraftPick(
     }
   }
 
-  // Check roster limits (2 of each type, total of 9 including 1 flex)
+  // Check roster limits (2 of each type except brand which is 1, total of 10 including 1 flex)
   const limits = {
     manufacturer: 2,
     cannabis_strain: 2,
     product: 2,
     pharmacy: 2,
+    brand: 1,
   };
 
   if (assetCounts[assetType] >= limits[assetType]) {
     // Check if we can use the FLEX spot
     const totalPicks = Object.values(assetCounts).reduce((a, b) => a + b, 0);
-    if (totalPicks >= 9) {
+    if (totalPicks >= 10) {
       return { valid: false, error: "Roster is full" };
     }
     // FLEX spot can be used for any position

@@ -22,7 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type AssetType = "manufacturer" | "cannabis_strain" | "product" | "pharmacy";
+type AssetType = "manufacturer" | "cannabis_strain" | "product" | "pharmacy" | "brand";
 
 interface LineupSlot {
   position: string;
@@ -593,6 +593,7 @@ export default function LineupEditor({
                             {player.assetType === "cannabis_strain" && <Leaf className="w-4 h-4 text-purple-500" />}
                             {player.assetType === "product" && <Package className="w-4 h-4 text-pink-500" />}
                             {player.assetType === "pharmacy" && <Building className="w-4 h-4 text-green-500" />}
+                            {player.assetType === "brand" && <Building2 className="w-4 h-4 text-yellow-500" />}
                           </div>
                           <div>
                             <p className="text-sm font-bold text-foreground">{player.name}</p>
