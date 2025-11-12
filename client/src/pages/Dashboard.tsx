@@ -71,7 +71,7 @@ export default function Dashboard() {
 
         {/* Platform Statistics */}
         {stats && (stats.manufacturerCount > 0 || stats.cannabisStrainCount > 0 || stats.pharmacyCount > 0) && (
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-5 gap-4 mb-8">
             <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
               <CardContent className="pt-6">
                 <div className="text-center">
@@ -103,6 +103,15 @@ export default function Dashboard() {
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground mb-1">Apotheken</p>
                   <p className="text-3xl font-bold text-foreground">{stats.pharmacyCount}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-1">Brands</p>
+                  <p className="text-3xl font-bold text-foreground">{stats.brandCount || 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Marketing</p>
                 </div>
               </CardContent>
             </Card>

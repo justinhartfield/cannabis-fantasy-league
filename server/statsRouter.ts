@@ -1,6 +1,6 @@
 import { publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { manufacturers, strains, pharmacies, cannabisStrains } from "../drizzle/schema";
+import { manufacturers, strains, pharmacies, cannabisStrains, brands } from "../drizzle/schema";
 import { count } from "drizzle-orm";
 
 export const statsRouter = router({
@@ -15,6 +15,7 @@ export const statsRouter = router({
         productCount: 0,
         cannabisStrainCount: 0,
         pharmacyCount: 0,
+        brandCount: 0,
         strainCount: 0,
       };
     }
@@ -28,11 +29,15 @@ export const statsRouter = router({
       // Get cannabis strain count (genetics/cultivars)
       const [cannabisStrainResult] = await db.select({ count: count() }).from(cannabisStrains);
 
+      // Get brand count
+      const [brandResult] = await db.select({ count: count() }).from(brands);
+
       return {
         manufacturerCount: manufacturerResult?.count || 0,
         productCount: strainResult?.count || 0, // Products (pharmaceutical)
         cannabisStrainCount: cannabisStrainResult?.count || 0, // Genetics/cultivars
         pharmacyCount: pharmacyResult?.count || 0,
+        brandCount: brandResult?.count || 0, // Marketing brands
         // Legacy field for backward compatibility
         strainCount: strainResult?.count || 0,
       };
@@ -43,6 +48,7 @@ export const statsRouter = router({
         productCount: 0,
         cannabisStrainCount: 0,
         pharmacyCount: 0,
+        brandCount: 0,
         strainCount: 0,
       };
     }
