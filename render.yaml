@@ -28,7 +28,6 @@ services:
   - type: cron
     name: cannabis-fantasy-league-scoring
     runtime: node
-    plan: free
     region: oregon
     schedule: "0 2 * * 1"  # Every Monday at 2:00 AM UTC
     buildCommand: npm install
