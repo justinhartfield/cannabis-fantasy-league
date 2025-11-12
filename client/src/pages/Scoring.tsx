@@ -39,7 +39,7 @@ interface TeamScore {
  */
 export default function Scoring() {
   const params = useParams();
-  const leagueId = parseInt(params.leagueId as string);
+  const leagueId = parseInt(params.id as string);
   const { user } = useAuth();
   
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
