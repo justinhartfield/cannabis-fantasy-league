@@ -525,7 +525,7 @@ export default function LineupEditor({
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Mein Roster {selectedSlot && `(Wähle Spieler für ${getPositionLabel(selectedSlot.position)})`}
+              Mein Roster {selectedSlot && `(Wähle Spieler für ${getPositionLabel(selectedSlot)})`}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -535,7 +535,7 @@ export default function LineupEditor({
               <div className="grid gap-2">
                 {roster.map((player: any) => {
                   const isInLineup = currentLineup.some(slot => slot.assetId === player.assetId && slot.assetType === player.assetType);
-                  const canSelect = !selectedSlot || selectedSlot.position === "FLEX" || getRequiredAssetType(selectedSlot.position) === player.assetType;
+                  const canSelect = !selectedSlot || selectedSlot === "FLEX" || getRequiredAssetType(selectedSlot) === player.assetType;
                   
                   return (
                     <button
