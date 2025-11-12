@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import LeagueNav from "@/components/LeagueNav";
+import { LeagueNav } from "@/components/LeagueNav";
 
 interface TeamScore {
   teamId: number;

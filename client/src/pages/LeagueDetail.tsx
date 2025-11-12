@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
-import LeagueNav from "@/components/LeagueNav";
+import { LeagueNav } from "@/components/LeagueNav";
 
 export default function LeagueDetail() {
   const { id } = useParams();
