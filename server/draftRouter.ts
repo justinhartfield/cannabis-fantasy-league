@@ -433,7 +433,7 @@ export const draftRouter = router({
           inArray(rosters.teamId, allTeams.map((t) => t.id))
         );
 
-      const expectedPicks = allTeams.length * 9; // 9 picks per team
+      const expectedPicks = allTeams.length * 10; // 10 picks per team (10 roster slots)
       const isDraftComplete = totalPicks.length >= expectedPicks;
 
       if (isDraftComplete) {

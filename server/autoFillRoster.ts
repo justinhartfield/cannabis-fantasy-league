@@ -1,6 +1,6 @@
 import { eq, and, notInArray } from "drizzle-orm";
 import { getDb } from "./db";
-import { rosters, draftPicks, teams, weeklyLineups } from "../drizzle/schema";
+import { rosters, draftPicks, teams, weeklyLineups, leagues } from "../drizzle/schema";
 
 /**
  * Auto-assign drafted players to appropriate lineup slots
@@ -13,11 +13,19 @@ async function autoAssignLineupSlots(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Get league info for current year/week
-  const [league] = await db
+  // Get team and league info for current year/week
+  const [team] = await db
     .select()
     .from(teams)
     .where(eq(teams.id, teamId))
+    .limit(1);
+
+  if (!team) return;
+
+  const [league] = await db
+    .select()
+    .from(leagues)
+    .where(eq(leagues.id, leagueId))
     .limit(1);
 
   if (!league) return;
@@ -32,8 +40,8 @@ async function autoAssignLineupSlots(
   // Assign to slots (first picks go to main slots, rest to flex/bench)
   const lineupData: any = {
     teamId,
-    year: new Date().getFullYear(),
-    week: 1, // Start with week 1
+    year: league.seasonYear,
+    week: league.currentWeek,
   };
 
   // Assign manufacturers
@@ -84,13 +92,18 @@ async function autoAssignLineupSlots(
 
   if (existingLineup.length === 0) {
     // Create new lineup
+    console.log(`[AutoFill] Creating new lineup for team ${teamId}, year ${lineupData.year}, week ${lineupData.week}`);
+    console.log(`[AutoFill] Lineup data:`, lineupData);
     await db.insert(weeklyLineups).values(lineupData);
+    console.log(`[AutoFill] Lineup created successfully`);
   } else {
     // Update existing lineup
+    console.log(`[AutoFill] Updating existing lineup ${existingLineup[0].id} for team ${teamId}`);
     await db
       .update(weeklyLineups)
       .set(lineupData)
       .where(eq(weeklyLineups.id, existingLineup[0].id));
+    console.log(`[AutoFill] Lineup updated successfully`);
   }
 }
 

@@ -166,7 +166,7 @@ export async function advanceDraftPick(leagueId: number): Promise<void> {
 
   if (!league) throw new Error("League not found");
 
-  const totalPicks = league.teamCount * 9; // 9 rounds total
+  const totalPicks = league.teamCount * 10; // 10 rounds total (10 roster slots)
   const nextPickNumber = league.currentDraftPick + 1;
 
   if (nextPickNumber > totalPicks) {
@@ -177,7 +177,7 @@ export async function advanceDraftPick(leagueId: number): Promise<void> {
         draftCompleted: 1,
         status: "active",
         currentDraftPick: totalPicks,
-        currentDraftRound: 9,
+        currentDraftRound: 10,
       })
       .where(eq(leagues.id, leagueId));
 
@@ -240,8 +240,8 @@ export async function getDraftStatus(leagueId: number) {
     draftCompleted: league.draftCompleted === 1,
     currentPick: league.currentDraftPick,
     currentRound: league.currentDraftRound,
-    totalRounds: 9,
-    totalPicks: league.teamCount * 9,
+    totalRounds: 10,
+    totalPicks: league.teamCount * 10,
     nextTeam: nextPick,
     draftType: league.draftType,
     pickTimeLimit: league.draftPickTimeLimit,
