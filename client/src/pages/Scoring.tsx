@@ -344,7 +344,7 @@ export default function Scoring() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                     <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
                       <div className="text-sm text-muted-foreground mb-1">Manufacturers</div>
                       <div className="text-2xl font-bold text-foreground">
@@ -367,6 +367,12 @@ export default function Scoring() {
                       <div className="text-sm text-muted-foreground mb-1">Pharmacies</div>
                       <div className="text-2xl font-bold text-foreground">
                         {(breakdown.score.phm1Points || 0) + (breakdown.score.phm2Points || 0)}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <div className="text-sm text-muted-foreground mb-1">Brands</div>
+                      <div className="text-2xl font-bold text-foreground">
+                        {breakdown.score.brd1Points || 0}
                       </div>
                     </div>
                   </div>
