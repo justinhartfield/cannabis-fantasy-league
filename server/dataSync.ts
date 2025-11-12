@@ -8,7 +8,7 @@
 import { getDb } from './db';
 import { getMetabaseClient } from './metabase';
 import { getCannabisStrainStatsCalculator } from './cannabisStrainStatsCalculator';
-import { manufacturers, strains, pharmacies, cannabisStrains } from '../drizzle/schema';
+import { manufacturers, strains, pharmacies, cannabisStrains, brands } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
 export class DataSyncService {
@@ -79,6 +79,78 @@ export class DataSyncService {
   }
 
   /**
+   * Sync brands from Metabase to database
+   */
+  async syncBrands(): Promise<void> {
+    console.log('[DataSync] Starting brands sync...');
+    
+    try {
+      const metabase = getMetabaseClient();
+      const brandData = await metabase.fetchBrands();
+      const db = await getDb();
+
+      if (!db) {
+        throw new Error('Database not available');
+      }
+
+      let synced = 0;
+      let errors = 0;
+
+      for (const brand of brandData) {
+        try {
+          // Check if brand exists
+          const existing = await db
+            .select()
+            .from(brands)
+            .where(eq(brands.name, brand.name))
+            .limit(1);
+
+          if (existing.length > 0) {
+            // Update existing brand
+            await db
+              .update(brands)
+              .set({
+                slug: brand.slug,
+                description: brand.description,
+                logoUrl: brand.logoUrl,
+                websiteUrl: brand.websiteUrl,
+                totalFavorites: brand.totalFavorites,
+                totalViews: brand.totalViews,
+                totalComments: brand.totalComments,
+                affiliateClicks: brand.affiliateClicks,
+                updatedAt: new Date().toISOString(),
+              })
+              .where(eq(brands.id, existing[0].id));
+          } else {
+            // Insert new brand
+            await db.insert(brands).values({
+              name: brand.name,
+              slug: brand.slug,
+              description: brand.description,
+              logoUrl: brand.logoUrl,
+              websiteUrl: brand.websiteUrl,
+              totalFavorites: brand.totalFavorites,
+              totalViews: brand.totalViews,
+              totalComments: brand.totalComments,
+              affiliateClicks: brand.affiliateClicks,
+            });
+          }
+
+          synced++;
+        } catch (error) {
+          console.error(`[DataSync] Error syncing brand ${brand.name}:`, error);
+          errors++;
+        }
+      }
+
+      console.log(`[DataSync] Brands sync complete: ${synced} synced, ${errors} errors`);
+    } catch (error) {
+      console.error('[DataSync] Brands sync failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Sync cannabis strains (genetics/cultivars) from Metabase to database
    */
   async syncCannabisStrains(): Promise<void> {
@@ -121,6 +193,7 @@ export class DataSyncService {
                 thcMax: strain.thcMax,
                 cbdMin: strain.cbdMin,
                 cbdMax: strain.cbdMax,
+                pharmaceuticalProductCount: strain.pharmaceuticalProductCount,
                 updatedAt: new Date(),
               })
               .where(eq(cannabisStrains.id, existing[0].id));
@@ -139,6 +212,7 @@ export class DataSyncService {
               thcMax: strain.thcMax,
               cbdMin: strain.cbdMin,
               cbdMax: strain.cbdMax,
+              pharmaceuticalProductCount: strain.pharmaceuticalProductCount,
             });
           }
 
@@ -344,8 +418,9 @@ export class DataSyncService {
     const startTime = Date.now();
 
     try {
-      // Sync in order: manufacturers and cannabis strains first (products depend on them)
+      // Sync in order: manufacturers, brands, and cannabis strains first (products depend on them)
       await this.syncManufacturers();
+      await this.syncBrands();
       await this.syncCannabisStrains();
       await this.syncStrains(); // Products
       await this.syncPharmacies();

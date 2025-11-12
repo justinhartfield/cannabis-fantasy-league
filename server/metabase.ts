@@ -41,6 +41,18 @@ interface StrainData {
   cbd_content: string | null;
 }
 
+interface BrandData {
+  name: string;
+  slug: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  totalFavorites: number;
+  totalViews: number;
+  totalComments: number;
+  affiliateClicks: number;
+}
+
 interface CannabisStrainData {
   metabaseId: string;
   name: string;
@@ -48,6 +60,7 @@ interface CannabisStrainData {
   type: string | null;
   description: string | null;
   effects: string[] | null;
+  pharmaceuticalProductCount: number;
   flavors: string[] | null;
   terpenes: string[] | null;
   thcMin: number | null;
@@ -135,6 +148,52 @@ export class MetabaseClient {
   }
 
   /**
+   * Fetch brands data for the brands table (not manufacturers)
+   */
+  async fetchBrands(): Promise<BrandData[]> {
+    console.log('[Metabase] Fetching brands data...');
+
+    try {
+      // Query Brand table for all brands
+      const rows = await this.executeQuery({
+        'source-table': TABLES.BRAND,
+        limit: 1000,
+      });
+
+      const brands: BrandData[] = rows.map((row: any) => {
+        // Based on weed.de Metabase schema:
+        // row[1] = name
+        // row[2] = slug
+        // row[3] = description
+        // row[5] = logoUrl
+        // row[6] = websiteUrl  
+        // row[7] = totalFavorites (NOT totalRatings)
+        // row[8] = totalViews
+        // row[9] = totalComments
+        // row[10] = affiliateClicks
+        
+        return {
+          name: row[1] || 'Unknown',
+          slug: row[2] || null,
+          description: row[3] || null,
+          logoUrl: row[5] || null,
+          websiteUrl: row[6] || null,
+          totalFavorites: typeof row[7] === 'number' ? row[7] : 0,
+          totalViews: typeof row[8] === 'number' ? row[8] : 0,
+          totalComments: typeof row[9] === 'number' ? row[9] : 0,
+          affiliateClicks: typeof row[10] === 'number' ? row[10] : 0,
+        };
+      });
+
+      console.log(`[Metabase] Fetched ${brands.length} brands`);
+      return brands;
+    } catch (error) {
+      console.error('[Metabase] Error fetching brands:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Fetch strain/product data
    */
   async fetchStrains(): Promise<StrainData[]> {
@@ -152,7 +211,9 @@ export class MetabaseClient {
         .map((row: any) => {
           const name = row[26] || 'Unknown'; // Index 26 is the product name
           const manufacturer = row[30] || 'Unknown'; // Index 30 is the manufacturer
-          const favoriteCount = row[4] || 0; // Index 4 is favorite count
+          // TODO: Verify row[4] is correct for favorites (not views/ratings)
+          // If favorites are showing tens of thousands, try row[7] or row[8] instead
+          const favoriteCount = row[4] || 0; // Index 4 is favorite count (needs verification)
           const price = row[32] || 0; // Index 32 is the price
           
           // Extract THC content from index 37
@@ -228,10 +289,21 @@ export class MetabaseClient {
             else if (typeStr.includes('hybrid')) strainType = 'hybrid';
           }
 
+          // Normalize strain name: white_widow -> White Widow
+          const rawName = row[1] || '';
+          const normalizedName = rawName
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+
+          // Get pharmaceutical product count (number of products using this strain)
+          const pharmaceuticalProductCount = typeof row[29] === 'number' ? row[29] : 0;
+
           return {
             metabaseId: row[0] || '',
-            name: row[1] || '',
+            name: normalizedName,
             slug: row[2] || '',
+            pharmaceuticalProductCount,
             type: strainType,
             description: null, // Description not available in current schema
             effects: row[24] || null, // Index 24: effects array

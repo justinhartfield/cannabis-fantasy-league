@@ -94,6 +94,33 @@ export const dataSyncRouter = router({
   }),
 
   /**
+   * Sync brands only
+   * Admin only
+   */
+  syncBrands: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.user.role !== 'admin') {
+      throw new Error('Unauthorized: Admin access required');
+    }
+
+    const syncService = getDataSyncService();
+    
+    try {
+      await syncService.syncBrands();
+      return {
+        success: true,
+        message: 'Brands sync completed successfully',
+      };
+    } catch (error) {
+      console.error('[DataSync API] Brands sync failed:', error);
+      return {
+        success: false,
+        message: 'Brands sync failed',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }),
+
+  /**
    * Sync strains only
    * Admin only
    */
