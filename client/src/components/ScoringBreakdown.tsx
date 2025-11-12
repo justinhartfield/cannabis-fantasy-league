@@ -1,6 +1,12 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus, Trophy, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Trophy, BarChart3, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ScoringComponent {
   category: string;
@@ -118,12 +124,24 @@ export default function ScoringBreakdown({
                 key={idx}
                 className="flex items-center justify-between p-2 rounded-md bg-muted/50"
               >
-                <div>
-                  <div className="text-sm font-medium text-foreground">
-                    {component.category}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {component.formula}
+                <div className="flex items-center gap-1">
+                  <div>
+                    <div className="text-sm font-medium text-foreground flex items-center gap-1">
+                      {component.category}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">{component.formula}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {component.formula}
+                    </div>
                   </div>
                 </div>
                 <div className="text-sm font-semibold text-foreground">

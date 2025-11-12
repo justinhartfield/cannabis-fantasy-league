@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ScoringBreakdown from "@/components/ScoringBreakdown";
+import { CategoryBarChart, TopPerformersPanel, PerformanceInsights, WeekOverWeekIndicator } from "@/components/ScoringEnhancements";
 import { 
   Trophy, 
   TrendingUp, 
@@ -48,6 +49,8 @@ export default function Scoring() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [liveScores, setLiveScores] = useState<TeamScore[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [assetSortBy, setAssetSortBy] = useState<'points' | 'name' | 'type'>('points');
+  const [assetFilter, setAssetFilter] = useState<string>('all');
 
   // Fetch league data
   const { data: league } = trpc.league.getById.useQuery({ leagueId: leagueId });
@@ -392,9 +395,79 @@ export default function Scoring() {
                     </div>
                   </div>
 
+                  {/* Visual Enhancements */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                    <CategoryBarChart
+                      categories={[
+                        { name: 'Manufacturers', points: (breakdown.score.mfg1Points || 0) + (breakdown.score.mfg2Points || 0), color: 'bg-blue-500' },
+                        { name: 'Strains', points: (breakdown.score.cstr1Points || 0) + (breakdown.score.cstr2Points || 0), color: 'bg-green-500' },
+                        { name: 'Products', points: (breakdown.score.prd1Points || 0) + (breakdown.score.prd2Points || 0), color: 'bg-purple-500' },
+                        { name: 'Pharmacies', points: (breakdown.score.phm1Points || 0) + (breakdown.score.phm2Points || 0), color: 'bg-orange-500' },
+                        { name: 'Brands', points: breakdown.score.brd1Points || 0, color: 'bg-yellow-500' },
+                      ]}
+                      totalPoints={breakdown.score.totalPoints || 0}
+                    />
+                    <TopPerformersPanel
+                      performers={breakdown.breakdowns
+                        .map((b: any) => ({
+                          assetName: b.assetName || `${b.assetType} #${b.assetId}`,
+                          assetType: b.assetType,
+                          points: b.totalPoints || 0,
+                          category: b.assetType === 'manufacturer' ? 'Manufacturer' :
+                                   b.assetType === 'cannabis_strain' ? 'Strain' :
+                                   b.assetType === 'product' ? 'Product' :
+                                   b.assetType === 'pharmacy' ? 'Pharmacy' : 'Brand',
+                        }))
+                        .sort((a: any, b: any) => b.points - a.points)
+                      }
+                    />
+                  </div>
+
                   {/* Individual Asset Breakdowns */}
+                  <div className="mb-4 flex items-center gap-4 p-4 bg-muted/50 rounded-lg border border-border">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium">Sort by:</label>
+                      <select
+                        value={assetSortBy}
+                        onChange={(e) => setAssetSortBy(e.target.value as 'points' | 'name' | 'type')}
+                        className="px-3 py-1.5 text-sm border rounded-md bg-background"
+                      >
+                        <option value="points">Points (High to Low)</option>
+                        <option value="name">Name (A-Z)</option>
+                        <option value="type">Type</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium">Filter:</label>
+                      <select
+                        value={assetFilter}
+                        onChange={(e) => setAssetFilter(e.target.value)}
+                        className="px-3 py-1.5 text-sm border rounded-md bg-background"
+                      >
+                        <option value="all">All Assets</option>
+                        <option value="manufacturer">Manufacturers</option>
+                        <option value="cannabis_strain">Strains</option>
+                        <option value="product">Products</option>
+                        <option value="pharmacy">Pharmacies</option>
+                        <option value="brand">Brands</option>
+                      </select>
+                    </div>
+                  </div>
                   <div className="space-y-4">
-                    {breakdown.breakdowns.map((assetBreakdown: any, index: number) => (
+                    {breakdown.breakdowns
+                      .filter((b: any) => assetFilter === 'all' || b.assetType === assetFilter)
+                      .sort((a: any, b: any) => {
+                        if (assetSortBy === 'points') {
+                          return (b.totalPoints || 0) - (a.totalPoints || 0);
+                        } else if (assetSortBy === 'name') {
+                          const nameA = a.assetName || `${a.assetType} #${a.assetId}`;
+                          const nameB = b.assetName || `${b.assetType} #${b.assetId}`;
+                          return nameA.localeCompare(nameB);
+                        } else {
+                          return a.assetType.localeCompare(b.assetType);
+                        }
+                      })
+                      .map((assetBreakdown: any, index: number) => (
                       <ScoringBreakdown
                         key={index}
                         data={{
