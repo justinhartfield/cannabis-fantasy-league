@@ -10,6 +10,14 @@ import { DraftClock } from "@/components/DraftClock";
 import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Draft() {
   const { id } = useParams();
@@ -28,6 +36,7 @@ export default function Draft() {
   const [currentTurnTeamName, setCurrentTurnTeamName] = useState<string>("");
   const [currentPickNumber, setCurrentPickNumber] = useState<number>(1);
   const [currentRound, setCurrentRound] = useState<number>(1);
+  const [showDraftCompleteDialog, setShowDraftCompleteDialog] = useState(false);
 
   const leagueId = parseInt(id!);
 
@@ -94,12 +103,10 @@ export default function Draft() {
         setCurrentRound(message.round);
         toast.info(`It's ${message.teamName}'s turn to pick!`);
       } else if (message.type === 'draft_complete') {
-        toast.success('🎉 Draft complete! Redirecting to league page...');
+        toast.success('🎉 Draft complete! All roster slots filled.');
         setTimerSeconds(null);
-        // Redirect to league page after 3 seconds
-        setTimeout(() => {
-          setLocation(`/league/${leagueId}`);
-        }, 3000);
+        // Show the draft completion dialog
+        setShowDraftCompleteDialog(true);
       } else if (message.type === 'timer_start') {
         setTimerSeconds(message.timeLimit);
         setTimeLimit(message.timeLimit);
@@ -204,6 +211,30 @@ export default function Draft() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Draft Complete Dialog */}
+      <Dialog open={showDraftCompleteDialog} onOpenChange={setShowDraftCompleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">🎉 Draft Complete!</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              All roster slots filled (10/10). Go to your Lineup Editor to review and adjust your starting lineup.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowDraftCompleteDialog(false);
+                setLocation(`/league/${leagueId}/lineup`);
+              }}
+              className="w-full sm:w-auto"
+            >
+              Go to Lineup Editor
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4">

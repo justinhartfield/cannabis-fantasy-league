@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Building2, 
   Leaf, 
@@ -12,7 +13,8 @@ import {
   Lock, 
   Unlock,
   TrendingUp,
-  Info
+  Info,
+  InfoIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -311,8 +313,24 @@ export default function LineupEditor({
   // Calculate total projected points
   const totalPoints = currentLineup.reduce((sum, slot) => sum + (slot.points || 0), 0);
 
+  // Check if lineup is auto-populated (has values but user hasn't edited yet)
+  const hasAutoPopulatedLineup = currentLineup.some(slot => slot.assetId !== null);
+  const allSlotsFilled = currentLineup.every(slot => slot.assetId !== null);
+
   return (
     <div className="space-y-6">
+      {/* Auto-populated info message */}
+      {hasAutoPopulatedLineup && !isLocked && (
+        <Alert className="bg-blue-500/10 border-blue-500/20">
+          <InfoIcon className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-sm text-foreground">
+            {allSlotsFilled 
+              ? "Your starting lineup has been auto-populated with your first 10 draft picks. You can change players before locking."
+              : "Your lineup has been partially auto-populated. Add more players from your roster below."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <Card>
         <CardHeader>
@@ -566,7 +584,9 @@ export default function LineupEditor({
           </CardHeader>
           <CardContent>
             {roster.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Keine Spieler im Roster</p>
+              <p className="text-center text-muted-foreground py-8">
+                Your roster is empty. Complete the draft or add players via waivers.
+              </p>
             ) : (
               <div className="grid gap-2">
                 {roster.map((player: any) => {

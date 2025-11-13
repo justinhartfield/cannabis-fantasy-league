@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { matchups, teams, weeklyTeamScores, leagues } from "../drizzle/schema";
 import { eq, and, or, desc, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { autoPopulateLeagueLineups } from "./lineupAutoPopulate";
 
 /**
  * Matchup Router
@@ -132,6 +133,22 @@ export const matchupRouter = router({
         await db.insert(matchups).values(matchupsToCreate);
       }
 
+      // Auto-populate lineups for all teams in this week
+      try {
+        const populateResult = await autoPopulateLeagueLineups(
+          input.leagueId,
+          input.year,
+          input.week
+        );
+        console.log(
+          `[generateWeekMatchups] Auto-populated ${populateResult.lineupsCreated} lineups ` +
+          `(${populateResult.lineupsSkipped} skipped, ${populateResult.errors} errors)`
+        );
+      } catch (error) {
+        console.error(`[generateWeekMatchups] Error auto-populating lineups:`, error);
+        // Don't fail the entire operation if lineup population fails
+      }
+
       return {
         success: true,
         matchupsCreated: matchupsToCreate.length,
@@ -246,6 +263,22 @@ export const matchupRouter = router({
             if (matchupsToCreate.length > 0) {
               await db.insert(matchups).values(matchupsToCreate);
               totalMatchups += matchupsToCreate.length;
+
+              // Auto-populate lineups for all teams in this week
+              try {
+                const populateResult = await autoPopulateLeagueLineups(
+                  input.leagueId,
+                  input.year,
+                  week
+                );
+                console.log(
+                  `[generateSeasonMatchups] Week ${week}: Auto-populated ${populateResult.lineupsCreated} lineups ` +
+                  `(${populateResult.lineupsSkipped} skipped, ${populateResult.errors} errors)`
+                );
+              } catch (populateError) {
+                console.error(`[generateSeasonMatchups] Week ${week}: Error auto-populating lineups:`, populateError);
+                // Don't fail the entire operation if lineup population fails
+              }
             }
           }
         } catch (error) {
