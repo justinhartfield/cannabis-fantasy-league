@@ -76,7 +76,7 @@ export const cannabisStrainWeeklyStats = pgTable("cannabisStrainWeeklyStats", {
 
 export const cannabisStrains = pgTable("cannabisStrains", {
 	id: serial().notNull(),
-	metabaseId: varchar({ length: 64 }),
+	metabaseId: varchar({ length: 64 }).notNull(),
 	name: varchar({ length: 255 }).notNull(),
 	slug: varchar({ length: 255 }),
 	type: varchar({ length: 50 }),
