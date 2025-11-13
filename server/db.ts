@@ -5,21 +5,30 @@ import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _client: ReturnType<typeof postgres> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const client = postgres(process.env.DATABASE_URL, {
+      _client = postgres(process.env.DATABASE_URL, {
         ssl: 'require'
       });
-      _db = drizzle(client);
+      _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      _client = null;
     }
   }
   return _db;
+}
+
+export async function getRawClient() {
+  if (!_client) {
+    await getDb(); // Initialize if not already done
+  }
+  return _client;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

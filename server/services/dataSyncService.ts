@@ -4,7 +4,7 @@
  * Includes comprehensive logging and error handling
  */
 
-import { getDb } from '../db';
+import { getDb, getRawClient } from '../db';
 import { getMetabaseClient } from '../metabase';
 import { cannabisStrains, brands, manufacturers, pharmacies, strains } from '../../drizzle/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -30,14 +30,14 @@ export class DataSyncServiceV2 {
       let synced = 0;
       let errors = 0;
 
+      // Get raw postgres client to bypass Drizzle ORM
+      const client = await getRawClient();
+      if (!client) throw new Error('Database client not available');
+
       for (const strain of strainsData) {
         try {
-          // Use Drizzle's insert with onConflictDoUpdate
-          const db = await getDb();
-          if (!db) throw new Error('Database not available');
-          
-          // Use raw SQL to avoid Drizzle ORM issues with onConflictDoUpdate
-          await db.execute(sql`
+          // Use raw postgres-js client directly with parameterized query
+          await client`
             INSERT INTO "cannabisStrains" (
               "metabaseId", "name", "slug", "type", "description",
               "effects", "flavors", "terpenes",
@@ -74,7 +74,7 @@ export class DataSyncServiceV2 {
               "cbdMax" = EXCLUDED."cbdMax",
               "pharmaceuticalProductCount" = EXCLUDED."pharmaceuticalProductCount",
               "updatedAt" = NOW()
-          `);
+          `;
 
           synced++;
           
