@@ -44,15 +44,14 @@ export const lineupRouter = router({
 
       if (!lineup) {
         // Create empty lineup if it doesn't exist
-        const [newLineup] = await db
+        await db
           .insert(weeklyLineups)
           .values({
             teamId: input.teamId,
             year: input.year,
             week: input.week,
             isLocked: false,
-          })
-          .$returningId();
+          });
 
         return {
           teamId: input.teamId,
