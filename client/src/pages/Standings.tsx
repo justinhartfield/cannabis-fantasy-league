@@ -215,6 +215,7 @@ export default function Standings() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       ) : (
