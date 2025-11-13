@@ -255,6 +255,7 @@ export default function Standings() {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }
