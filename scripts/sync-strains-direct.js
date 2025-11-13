@@ -104,10 +104,10 @@ async function syncStrains() {
         // Get pharmaceutical product count
         const pharmaceuticalProductCount = typeof row[29] === 'number' ? row[29] : 0;
 
-        // Convert arrays to JSON strings for PostgreSQL
-        const effects = row[24] ? JSON.stringify(row[24]) : null;
-        const flavors = row[35] ? JSON.stringify(row[35]) : null;
-        const terpenes = row[37] ? JSON.stringify(row[37]) : null;
+        // Pass arrays directly - Drizzle will handle JSON conversion
+        const effects = row[24] || null;
+        const flavors = row[35] || null;
+        const terpenes = row[37] || null;
 
         const strainData = {
           metabaseId: row[0],
