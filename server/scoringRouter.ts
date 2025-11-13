@@ -14,6 +14,7 @@ import {
   teams,
   manufacturers,
   cannabisStrains,
+  strains,
   pharmacies,
   brands,
 } from '../drizzle/schema';
@@ -173,6 +174,7 @@ export const scoringRouter = router({
       // Fetch names for each asset type
       const manufacturerIds: number[] = [];
       const strainIds: number[] = [];
+      const productIds: number[] = [];
       const pharmacyIds: number[] = [];
       const brandIds: number[] = [];
 
@@ -181,6 +183,8 @@ export const scoringRouter = router({
           manufacturerIds.push(bd.assetId);
         } else if (bd.assetType === 'cannabis_strain') {
           strainIds.push(bd.assetId);
+        } else if (bd.assetType === 'product') {
+          productIds.push(bd.assetId);
         } else if (bd.assetType === 'pharmacy') {
           pharmacyIds.push(bd.assetId);
         } else if (bd.assetType === 'brand') {
@@ -189,7 +193,7 @@ export const scoringRouter = router({
       });
 
       // Fetch names in parallel
-      const [manufacturerNames, strainNames, pharmacyNames, brandNames] = await Promise.all([
+      const [manufacturerNames, strainNames, productNames, pharmacyNames, brandNames] = await Promise.all([
         manufacturerIds.length > 0
           ? db.select({ id: manufacturers.id, name: manufacturers.name })
               .from(manufacturers)
@@ -199,6 +203,11 @@ export const scoringRouter = router({
           ? db.select({ id: cannabisStrains.id, name: cannabisStrains.name })
               .from(cannabisStrains)
               .where(inArray(cannabisStrains.id, strainIds))
+          : [],
+        productIds.length > 0
+          ? db.select({ id: strains.id, name: strains.name })
+              .from(strains)
+              .where(inArray(strains.id, productIds))
           : [],
         pharmacyIds.length > 0
           ? db.select({ id: pharmacies.id, name: pharmacies.name })
@@ -216,6 +225,7 @@ export const scoringRouter = router({
       const nameMap = new Map<number, string>();
       manufacturerNames.forEach((m) => nameMap.set(m.id, m.name));
       strainNames.forEach((s) => nameMap.set(s.id, s.name));
+      productNames.forEach((p) => nameMap.set(p.id, p.name));
       pharmacyNames.forEach((p) => nameMap.set(p.id, p.name));
       brandNames.forEach((b) => nameMap.set(b.id, b.name));
 
