@@ -180,7 +180,7 @@ export default function DailyChallenge() {
         });
         // After showing result, redirect to draft
         setTimeout(() => {
-          setLocation(`/draft/${challengeId}`);
+          setLocation(`/league/${challengeId}/draft`);
         }, 5000);
       }
     },
@@ -435,6 +435,37 @@ export default function DailyChallenge() {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {/* Draft In Progress Banner */}
+        {(league?.status === 'draft' || (league?.draftStarted === 1 && league?.draftCompleted === 0)) && league.teams?.length === 2 && (
+          <Card className="gradient-card border-primary/50 glow-primary slide-in-bottom">
+            <CardContent className="p-6">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 rounded-full gradient-primary flex items-center justify-center glow-primary animate-pulse">
+                    <Trophy className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-gradient-primary mb-2">
+                    🎯 DRAFT IN PROGRESS
+                  </h2>
+                  <p className="text-muted-foreground mb-4">
+                    Beide Spieler sind dabei, ihre Teams zu draften
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setLocation(`/league/${challengeId}/draft`)}
+                  className="gradient-primary"
+                  size="lg"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Zum Draft Board
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Challenge Complete Banner */}
         {league?.status === 'complete' && winner && (
           <Card className="gradient-card border-border/50 glow-primary slide-in-bottom">
