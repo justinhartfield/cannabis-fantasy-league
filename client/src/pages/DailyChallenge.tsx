@@ -28,6 +28,16 @@ interface TeamScore {
   rank?: number;
 }
 
+interface ChallengeSummary {
+  id: number;
+  name: string;
+  status: string;
+  currentWeek: number;
+  seasonYear: number;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
 export default function DailyChallenge() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
@@ -73,6 +83,10 @@ export default function DailyChallenge() {
       enabled: !!selectedTeamId,
     }
   );
+
+  const { data: userLeagues } = trpc.league.list.useQuery(undefined, {
+    enabled: !!isAuthenticated,
+  });
 
   const [redirecting, setRedirecting] = useState(false);
 
@@ -120,8 +134,12 @@ export default function DailyChallenge() {
   const scoreDiff =
     leader && challenger ? (leader.points || 0) - (challenger.points || 0) : 0;
 
-  const topPerformers = useMemo(() => {
-    if (!breakdown || !breakdown.breakdowns) return [];
+  const topPerformers = useMemo<
+    { name: string; type: string; total: number; breakdown: any }[]
+  >(() => {
+    if (!breakdown || !breakdown.breakdowns) {
+      return [];
+    }
     return breakdown.breakdowns
       .map((item: any) => ({
         name: item.assetName || `${item.assetType} #${item.assetId}`,
@@ -129,9 +147,35 @@ export default function DailyChallenge() {
         total: item.totalPoints || 0,
         breakdown: item.breakdown,
       }))
-      .sort((a, b) => b.total - a.total)
+      .sort((a: { total: number }, b: { total: number }) => b.total - a.total)
       .slice(0, 3);
   }, [breakdown]);
+
+  const recentChallenges = useMemo<ChallengeSummary[]>(() => {
+    if (!userLeagues) return [];
+    return userLeagues
+      .filter(
+        (item: any) =>
+          item.leagueType === "challenge" && item.id !== challengeId
+      )
+      .map(
+        (item: any): ChallengeSummary => ({
+          id: item.id,
+          name: item.name,
+          status: item.status,
+          currentWeek: item.currentWeek,
+          seasonYear: item.seasonYear,
+          updatedAt: item.updatedAt,
+          createdAt: item.createdAt,
+        })
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.createdAt || Date.now()).getTime() -
+          new Date(a.updatedAt || a.createdAt || Date.now()).getTime()
+      )
+      .slice(0, 4);
+  }, [userLeagues, challengeId]);
 
   if (
     !challengeId ||
@@ -199,7 +243,7 @@ export default function DailyChallenge() {
 
       <main className="container mx-auto px-4 py-8 space-y-6">
         {/* Hero Scoreboard */}
-        <Card className="gradient-card border-border/50 glow-primary">
+        <Card className="gradient-card border-border/50 glow-primary slide-in-bottom">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="flex-1 flex items-center justify-between gap-6">
@@ -255,28 +299,41 @@ export default function DailyChallenge() {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatBadge
-            label="Score Differenz"
-            value={`${scoreDiff >= 0 ? "+" : ""}${scoreDiff.toFixed(1)}`}
-            icon={Flame}
-            variant="primary"
-          />
-          <StatBadge
-            label="Aktive Teams"
-            value={weekScores?.length || 0}
-            icon={Sparkles}
-            variant="secondary"
-          />
-          <StatBadge
-            label="Dein Team"
-            value={
-              league.teams?.find((team: any) => team.userId === user?.id)
+          {[
+            {
+              label: "Score Differenz",
+              value: `${scoreDiff >= 0 ? "+" : ""}${scoreDiff.toFixed(1)}`,
+              icon: Flame,
+              variant: "primary" as const,
+            },
+            {
+              label: "Aktive Teams",
+              value: weekScores?.length || 0,
+              icon: Sparkles,
+              variant: "secondary" as const,
+            },
+            {
+              label: "Dein Team",
+              value: league.teams?.find((team: any) => team.userId === user?.id)
                 ? "Aktiv"
-                : "Zuschauer"
-            }
-            icon={UserCircle}
-            variant="purple"
-          />
+                : "Zuschauer",
+              icon: UserCircle,
+              variant: "purple" as const,
+            },
+          ].map((stat, index) => (
+            <div
+              key={stat.label}
+              className="slide-in-bottom"
+              style={{ animationDelay: `${index * 0.08}s` }}
+            >
+              <StatBadge
+                label={stat.label}
+                value={stat.value}
+                icon={stat.icon}
+                variant={stat.variant}
+              />
+            </div>
+          ))}
         </div>
 
         {/* Team Selector */}
@@ -311,8 +368,9 @@ export default function DailyChallenge() {
             <div className="grid md:grid-cols-3 gap-4">
               {topPerformers.map((performer, index) => (
                 <Card
-                  key={index}
-                  className="gradient-card border-border/40 card-hover-lift"
+                  key={`${performer.name}-${index}`}
+                  className="gradient-card border-border/40 card-hover-lift slide-in-bottom"
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
@@ -340,6 +398,60 @@ export default function DailyChallenge() {
           </div>
         )}
 
+        {recentChallenges.length > 0 && (
+          <Card className="border-border/50 bg-card/70 slide-in-bottom">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  Recent Challenges
+                </h3>
+                <Badge variant="outline">{recentChallenges.length}</Badge>
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                {recentChallenges.map((challenge: ChallengeSummary, index) => {
+                  const status =
+                    challenge.status === "active"
+                      ? "Live"
+                      : challenge.status === "draft"
+                      ? "Upcoming"
+                      : "Final";
+
+                  return (
+                    <div
+                      key={challenge.id}
+                      className="rounded-xl border border-border/40 bg-card/70 p-4 card-hover-lift slide-in-bottom"
+                      style={{ animationDelay: `${index * 0.08}s` }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline" className="uppercase text-xs">
+                          {status}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(challenge.updatedAt || challenge.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="text-lg font-semibold text-foreground">
+                        {challenge.name}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Week {challenge.currentWeek} • {challenge.seasonYear}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-3 text-primary hover:text-primary/80 hover:bg-primary/10"
+                        onClick={() => setLocation(`/challenge/${challenge.id}`)}
+                      >
+                        View Challenge
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Detailed Breakdown */}
         {selectedTeamId && breakdown?.breakdowns?.length ? (
           <div className="space-y-4">
@@ -348,21 +460,22 @@ export default function DailyChallenge() {
             </h3>
             <div className="grid gap-4">
               {breakdown.breakdowns.map((item: any, index: number) => (
-                <ScoringBreakdown
-                  key={`${item.assetId}-${index}`}
-                  data={{
-                    assetName:
-                      item.assetName || `${item.assetType} #${item.assetId}`,
-                    assetType: item.assetType,
-                    components: item.breakdown?.components || [],
-                    bonuses: item.breakdown?.bonuses || [],
-                    penalties: item.breakdown?.penalties || [],
-                    subtotal: item.breakdown?.subtotal || 0,
-                    total: item.totalPoints || 0,
-                  }}
-                  leagueAverage={item.leagueAverage}
-                  weeklyTrend={item.weeklyTrend}
-                />
+                <div key={`${item.assetId}-${index}`}>
+                  <ScoringBreakdown
+                    data={{
+                      assetName:
+                        item.assetName || `${item.assetType} #${item.assetId}`,
+                      assetType: item.assetType,
+                      components: item.breakdown?.components || [],
+                      bonuses: item.breakdown?.bonuses || [],
+                      penalties: item.breakdown?.penalties || [],
+                      subtotal: item.breakdown?.subtotal || 0,
+                      total: item.totalPoints || 0,
+                    }}
+                    leagueAverage={item.leagueAverage}
+                    weeklyTrend={item.weeklyTrend}
+                  />
+                </div>
               ))}
             </div>
           </div>
