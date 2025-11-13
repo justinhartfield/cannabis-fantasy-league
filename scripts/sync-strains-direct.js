@@ -78,20 +78,51 @@ async function syncStrains() {
     
     for (const row of rows) {
       try {
+        // Extract THC range from index 44
+        let thcMin = null, thcMax = null;
+        if (row[44] && typeof row[44] === 'object') {
+          thcMin = row[44].rangeLow || null;
+          thcMax = row[44].rangeHigh || null;
+        }
+
+        // Extract CBD range from index 11
+        let cbdMin = null, cbdMax = null;
+        if (row[11] && typeof row[11] === 'object') {
+          cbdMin = row[11].rangeLow || null;
+          cbdMax = row[11].rangeHigh || null;
+        }
+
+        // Extract type from index 36 (array of types)
+        let strainType = null;
+        if (row[36] && Array.isArray(row[36]) && row[36].length > 0) {
+          const typeStr = row[36][0].toLowerCase();
+          if (typeStr.includes('sativa')) strainType = 'sativa';
+          else if (typeStr.includes('indica')) strainType = 'indica';
+          else if (typeStr.includes('hybrid')) strainType = 'hybrid';
+        }
+
+        // Get pharmaceutical product count
+        const pharmaceuticalProductCount = typeof row[29] === 'number' ? row[29] : 0;
+
+        // Convert arrays to JSON strings for PostgreSQL
+        const effects = row[24] ? JSON.stringify(row[24]) : null;
+        const flavors = row[35] ? JSON.stringify(row[35]) : null;
+        const terpenes = row[37] ? JSON.stringify(row[37]) : null;
+
         const strainData = {
           metabaseId: row[0],
           name: normalizeStrainName(row[1]),
           slug: row[2],
-          type: row[3],
-          description: row[4],
-          effects: row[5],
-          flavors: row[6],
-          terpenes: row[7],
-          thcMin: row[8],
-          thcMax: row[9],
-          cbdMin: row[10],
-          cbdMax: row[11],
-          pharmaceuticalProductCount: row[12] || 0,
+          type: strainType,
+          description: null,
+          effects,
+          flavors,
+          terpenes,
+          thcMin,
+          thcMax,
+          cbdMin,
+          cbdMax,
+          pharmaceuticalProductCount,
         };
         
         // Insert or update using raw SQL
