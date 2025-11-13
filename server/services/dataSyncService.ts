@@ -7,7 +7,7 @@
 import { getDb } from '../db';
 import { getMetabaseClient } from '../metabase';
 import { cannabisStrains, brands, manufacturers, pharmacies, strains } from '../../drizzle/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createSyncJob, SyncLogger } from './syncLogger';
 
 export class DataSyncServiceV2 {
@@ -42,9 +42,9 @@ export class DataSyncServiceV2 {
               slug: strain.slug,
               type: strain.type,
               description: strain.description,
-              effects: strain.effects || null,
-              flavors: strain.flavors || null,
-              terpenes: strain.terpenes || null,
+              effects: strain.effects ? sql.raw(`'${JSON.stringify(strain.effects)}'::json`) : null,
+              flavors: strain.flavors ? sql.raw(`'${JSON.stringify(strain.flavors)}'::json`) : null,
+              terpenes: strain.terpenes ? sql.raw(`'${JSON.stringify(strain.terpenes)}'::json`) : null,
               thcMin: strain.thcMin,
               thcMax: strain.thcMax,
               cbdMin: strain.cbdMin,
@@ -58,9 +58,9 @@ export class DataSyncServiceV2 {
                 slug: strain.slug,
                 type: strain.type,
                 description: strain.description,
-                effects: strain.effects || null,
-                flavors: strain.flavors || null,
-                terpenes: strain.terpenes || null,
+                effects: strain.effects ? sql.raw(`'${JSON.stringify(strain.effects)}'::json`) : null,
+                flavors: strain.flavors ? sql.raw(`'${JSON.stringify(strain.flavors)}'::json`) : null,
+                terpenes: strain.terpenes ? sql.raw(`'${JSON.stringify(strain.terpenes)}'::json`) : null,
                 thcMin: strain.thcMin,
                 thcMax: strain.thcMax,
                 cbdMin: strain.cbdMin,
