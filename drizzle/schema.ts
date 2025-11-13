@@ -88,7 +88,7 @@ export const cannabisStrains = pgTable("cannabisStrains", {
 	thcMax: integer(),
 	cbdMin: integer(),
 	cbdMax: integer(),
-	pharmaceuticalProductCount: integer().default(0).notNull(),
+	pharmaceuticalProductCount: integer().default(0),
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 },
