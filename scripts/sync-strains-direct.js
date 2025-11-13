@@ -5,7 +5,7 @@
 
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import { cannabisStrains } from '../drizzle/schema.js';
+import { eq, sql } from 'drizzle-orm';
 
 const { Pool } = pg;
 
@@ -87,13 +87,32 @@ async function syncStrains() {
           pharmaceuticalProductCount: row[12] || 0,
         };
         
-        // Insert or update
-        await db.insert(cannabisStrains)
-          .values(strainData)
-          .onConflictDoUpdate({
-            target: cannabisStrains.metabaseId,
-            set: strainData,
-          });
+        // Insert or update using raw SQL
+        await db.execute(sql`
+          INSERT INTO "cannabisStrains" (
+            "metabaseId", name, slug, type, description, effects, flavors, terpenes,
+            "thcMin", "thcMax", "cbdMin", "cbdMax", "pharmaceuticalProductCount"
+          ) VALUES (
+            ${strainData.metabaseId}, ${strainData.name}, ${strainData.slug}, ${strainData.type},
+            ${strainData.description}, ${strainData.effects}, ${strainData.flavors}, ${strainData.terpenes},
+            ${strainData.thcMin}, ${strainData.thcMax}, ${strainData.cbdMin}, ${strainData.cbdMax},
+            ${strainData.pharmaceuticalProductCount}
+          )
+          ON CONFLICT ("metabaseId") DO UPDATE SET
+            name = EXCLUDED.name,
+            slug = EXCLUDED.slug,
+            type = EXCLUDED.type,
+            description = EXCLUDED.description,
+            effects = EXCLUDED.effects,
+            flavors = EXCLUDED.flavors,
+            terpenes = EXCLUDED.terpenes,
+            "thcMin" = EXCLUDED."thcMin",
+            "thcMax" = EXCLUDED."thcMax",
+            "cbdMin" = EXCLUDED."cbdMin",
+            "cbdMax" = EXCLUDED."cbdMax",
+            "pharmaceuticalProductCount" = EXCLUDED."pharmaceuticalProductCount",
+            "updatedAt" = CURRENT_TIMESTAMP
+        `);
         
         synced++;
         
