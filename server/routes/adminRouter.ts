@@ -162,6 +162,41 @@ export const adminRouter = router({
   }),
 
   /**
+   * Sync weekly stats for a specific year and week
+   */
+  syncWeeklyStats: protectedProcedure
+    .input(z.object({
+      year: z.number().min(2020).max(2030),
+      week: z.number().min(1).max(53),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      const syncService = getDataSyncServiceV2();
+      
+      try {
+        // Run sync in background (don't await fully)
+        syncService.syncWeeklyStats(input.year, input.week).catch(err => {
+          console.error('[Admin] Weekly stats sync background error:', err);
+        });
+        
+        return {
+          success: true,
+          message: `Weekly stats sync started for ${input.year}-W${input.week}`,
+        };
+      } catch (error) {
+        console.error('[Admin] Failed to start weekly stats sync:', error);
+        return {
+          success: false,
+          message: 'Failed to start weekly stats sync',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }),
+
+  /**
    * Get recent sync jobs
    */
   getSyncJobs: protectedProcedure

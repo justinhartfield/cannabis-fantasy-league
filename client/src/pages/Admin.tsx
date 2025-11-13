@@ -1,8 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import { Database, RefreshCw, Loader2, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Database, RefreshCw, Loader2, CheckCircle, XCircle, Eye, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -10,6 +12,8 @@ import { formatDistanceToNow } from "date-fns";
 export default function Admin() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  const [weekYear, setWeekYear] = useState<number>(2025);
+  const [weekNumber, setWeekNumber] = useState<number>(1);
 
   // Queries
   const { data: stats, refetch: refetchStats } = trpc.admin.getDashboardStats.useQuery(undefined, {
@@ -93,6 +97,19 @@ export default function Admin() {
     },
     onError: (error) => {
       toast.error(`Failed to start full sync: ${error.message}`);
+    },
+  });
+
+  const syncWeeklyStats = trpc.admin.syncWeeklyStats.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message || "Weekly stats sync started successfully!");
+      setTimeout(() => {
+        refetchJobs();
+        refetchStats();
+      }, 1000);
+    },
+    onError: (error) => {
+      toast.error(`Failed to start weekly stats sync: ${error.message}`);
     },
   });
 
@@ -321,6 +338,69 @@ export default function Admin() {
                     </>
                   )}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Weekly Stats Sync */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Weekly Stats Sync
+              </CardTitle>
+              <CardDescription>
+                Populate weekly stats tables for a specific year and week. This is required for scoring calculations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="week-year">Year</Label>
+                    <Input
+                      id="week-year"
+                      type="number"
+                      min={2020}
+                      max={2030}
+                      value={weekYear}
+                      onChange={(e) => setWeekYear(parseInt(e.target.value) || 2025)}
+                      placeholder="2025"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="week-number">Week</Label>
+                    <Input
+                      id="week-number"
+                      type="number"
+                      min={1}
+                      max={53}
+                      value={weekNumber}
+                      onChange={(e) => setWeekNumber(parseInt(e.target.value) || 1)}
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={() => syncWeeklyStats.mutate({ year: weekYear, week: weekNumber })}
+                  disabled={syncWeeklyStats.isPending}
+                  className="w-full"
+                >
+                  {syncWeeklyStats.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing {weekYear}-W{weekNumber}...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Sync Weekly Stats for {weekYear}-W{weekNumber}
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  This will populate manufacturerWeeklyStats, cannabisStrainWeeklyStats, pharmacyWeeklyStats, and brandWeeklyStats tables with data for the specified week.
+                </p>
               </div>
             </CardContent>
           </Card>
