@@ -80,6 +80,9 @@ export class DataSyncServiceV2 {
           errors++;
           await logger.error(`Failed to sync strain: ${strain.name}`, {
             error: error instanceof Error ? error.message : String(error),
+            errorDetails: error instanceof Error ? error.stack : String(error),
+            errorCode: (error as any)?.code,
+            errorDetail: (error as any)?.detail,
             strain: strain.name,
           });
         }
