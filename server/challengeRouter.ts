@@ -1,7 +1,7 @@
 import { router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { leagues, teams, weeklyScores } from "../drizzle/schema";
+import { leagues, teams, weeklyTeamScores } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 /**
@@ -61,11 +61,11 @@ export const challengeRouter = router({
       // Get all team scores for this challenge
       const scores = await db
         .select()
-        .from(weeklyScores)
+        .from(weeklyTeamScores)
         .where(and(
-          eq(weeklyScores.leagueId, input.challengeId),
-          eq(weeklyScores.year, input.year),
-          eq(weeklyScores.week, input.week)
+          eq(weeklyTeamScores.leagueId, input.challengeId),
+          eq(weeklyTeamScores.year, input.year),
+          eq(weeklyTeamScores.week, input.week)
         ));
 
       // Join with team names
