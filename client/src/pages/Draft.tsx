@@ -5,11 +5,12 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import DraftBoard from "@/components/DraftBoard";
+import { DraftPicksGrid } from "@/components/DraftPicksGrid";
 import { MyRoster } from "@/components/MyRoster";
 import { DraftClock } from "@/components/DraftClock";
 import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +61,18 @@ export default function Draft() {
     { enabled: !!id && isAuthenticated, refetchInterval: 5000 }
   );
 
+  const currentYear = league?.seasonYear || new Date().getFullYear();
+  const currentWeek = league?.currentWeek || 1;
+
+  const { data: allPicks = [], refetch: refetchAllPicks } = trpc.draft.getAllDraftPicks.useQuery(
+    {
+      leagueId,
+      year: currentYear,
+      week: currentWeek,
+    },
+    { enabled: !!league && isAuthenticated }
+  );
+
   // Initialize current turn from draft status
   useEffect(() => {
     if (draftStatus?.nextPick) {
@@ -94,8 +107,9 @@ export default function Draft() {
         // Show toast notification
         toast.success(`${message.teamName} drafted ${message.assetName}`);
 
-        // Refetch roster to update UI
+        // Refetch roster and all picks to update UI
         refetchRoster();
+        refetchAllPicks();
       } else if (message.type === 'next_pick') {
         setCurrentTurnTeamId(message.teamId);
         setCurrentTurnTeamName(message.teamName);
@@ -307,24 +321,30 @@ export default function Draft() {
       {/* Draft Board */}
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Draft Board */}
-          <div className="lg:col-span-3">
-            <DraftBoard
-              leagueId={leagueId}
-              currentPick={currentPick}
-              isMyTurn={isMyTurn}
-              myRoster={roster.map((r: any) => ({
-                assetType: r.assetType,
-                assetId: r.assetId,
-                name: r.name || "Unknown",
-              }))}
-              remainingTime={timerSeconds}
-              onDraftPick={handleDraftPick}
-            />
+          {/* Draft Picks Grid - Full width on mobile, 3 cols on desktop */}
+          <div className="lg:col-span-3 order-2 lg:order-1">
+            <div className="space-y-6">
+              <DraftPicksGrid 
+                picks={allPicks}
+                currentPickNumber={currentPickNumber}
+              />
+              <DraftBoard
+                leagueId={leagueId}
+                currentPick={currentPick}
+                isMyTurn={isMyTurn}
+                myRoster={roster.map((r: any) => ({
+                  assetType: r.assetType,
+                  assetId: r.assetId,
+                  name: r.name || "Unknown",
+                }))}
+                remainingTime={timerSeconds}
+                onDraftPick={handleDraftPick}
+              />
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
+          {/* Sidebar - Full width on mobile, 1 col on desktop */}
+          <div className="lg:col-span-1 order-1 lg:order-2 space-y-6">
             {/* Draft Clock */}
             {timerSeconds !== null && currentTurnTeamName && (
               <DraftClock

@@ -41,8 +41,8 @@ export default function DraftBoard({
 }: DraftBoardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<AssetType | "all" | "brand">("all");
-  const [sortBy, setSortBy] = useState<"name" | "stats">("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<"name" | "stats">("stats");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Fetch available players from backend
   const { data: manufacturers = [], isLoading: loadingMfg } = trpc.draft.getAvailableManufacturers.useQuery({

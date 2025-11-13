@@ -2,7 +2,22 @@ import { z } from "zod";
 import { eq, and, notInArray, inArray, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { manufacturers, cannabisStrains, strains, pharmacies, brands, rosters, leagues, teams, draftPicks } from "../drizzle/schema";
+import { 
+  manufacturers, 
+  cannabisStrains, 
+  strains, 
+  pharmacies, 
+  brands, 
+  rosters, 
+  leagues, 
+  teams, 
+  draftPicks,
+  manufacturerWeeklyStats,
+  cannabisStrainWeeklyStats,
+  strainWeeklyStats,
+  pharmacyWeeklyStats,
+  brandWeeklyStats,
+} from "../drizzle/schema";
 import { wsManager } from "./websocket";
 import { validateDraftPick, advanceDraftPick, calculateNextPick, getDraftStatus, checkAndCompleteDraft } from "./draftLogic";
 import { draftTimerManager } from "./draftTimer";
@@ -602,5 +617,216 @@ export const draftRouter = router({
         message: "Draft is not yet complete",
         completed: false,
       };
+    }),
+
+  /**
+   * Get all draft picks with scoring data for live draft board
+   */
+  getAllDraftPicks: protectedProcedure
+    .input(z.object({
+      leagueId: z.number(),
+      year: z.number(),
+      week: z.number(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      // Fetch all draft picks for this league
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.leagueId, input.leagueId))
+        .orderBy(draftPicks.pickNumber);
+
+      // Get team names
+      const teamMap = new Map<number, string>();
+      const leagueTeams = await db
+        .select()
+        .from(teams)
+        .where(eq(teams.leagueId, input.leagueId));
+      leagueTeams.forEach(t => teamMap.set(t.id, t.name));
+
+      // Process each pick to get asset name and stats
+      const enrichedPicks = await Promise.all(picks.map(async (pick) => {
+        let assetName = "Unknown";
+        let lastWeekPoints: number | null = null;
+        let trendPercent: number | null = null;
+
+        // Fetch asset name and stats based on type
+        if (pick.assetType === 'manufacturer') {
+          const [asset] = await db.select().from(manufacturers).where(eq(manufacturers.id, pick.assetId)).limit(1);
+          assetName = asset?.name || "Unknown";
+
+          // Fetch last week stats
+          const [lastWeekStat] = await db
+            .select()
+            .from(manufacturerWeeklyStats)
+            .where(and(
+              eq(manufacturerWeeklyStats.manufacturerId, pick.assetId),
+              eq(manufacturerWeeklyStats.year, input.year),
+              eq(manufacturerWeeklyStats.week, input.week - 1)
+            ))
+            .limit(1);
+          
+          if (lastWeekStat) {
+            lastWeekPoints = lastWeekStat.totalPoints;
+
+            // Get week-2 for trend
+            const [twoWeeksAgo] = await db
+              .select()
+              .from(manufacturerWeeklyStats)
+              .where(and(
+                eq(manufacturerWeeklyStats.manufacturerId, pick.assetId),
+                eq(manufacturerWeeklyStats.year, input.year),
+                eq(manufacturerWeeklyStats.week, input.week - 2)
+              ))
+              .limit(1);
+
+            if (twoWeeksAgo && twoWeeksAgo.totalPoints > 0) {
+              trendPercent = ((lastWeekStat.totalPoints - twoWeeksAgo.totalPoints) / twoWeeksAgo.totalPoints) * 100;
+            }
+          }
+        } else if (pick.assetType === 'cannabis_strain') {
+          const [asset] = await db.select().from(cannabisStrains).where(eq(cannabisStrains.id, pick.assetId)).limit(1);
+          assetName = asset?.name || "Unknown";
+
+          const [lastWeekStat] = await db
+            .select()
+            .from(cannabisStrainWeeklyStats)
+            .where(and(
+              eq(cannabisStrainWeeklyStats.cannabisStrainId, pick.assetId),
+              eq(cannabisStrainWeeklyStats.year, input.year),
+              eq(cannabisStrainWeeklyStats.week, input.week - 1)
+            ))
+            .limit(1);
+
+          if (lastWeekStat) {
+            lastWeekPoints = lastWeekStat.totalPoints;
+
+            const [twoWeeksAgo] = await db
+              .select()
+              .from(cannabisStrainWeeklyStats)
+              .where(and(
+                eq(cannabisStrainWeeklyStats.cannabisStrainId, pick.assetId),
+                eq(cannabisStrainWeeklyStats.year, input.year),
+                eq(cannabisStrainWeeklyStats.week, input.week - 2)
+              ))
+              .limit(1);
+
+            if (twoWeeksAgo && twoWeeksAgo.totalPoints > 0) {
+              trendPercent = ((lastWeekStat.totalPoints - twoWeeksAgo.totalPoints) / twoWeeksAgo.totalPoints) * 100;
+            }
+          }
+        } else if (pick.assetType === 'product') {
+          const [asset] = await db.select().from(strains).where(eq(strains.id, pick.assetId)).limit(1);
+          assetName = asset?.name || "Unknown";
+
+          const [lastWeekStat] = await db
+            .select()
+            .from(strainWeeklyStats)
+            .where(and(
+              eq(strainWeeklyStats.strainId, pick.assetId),
+              eq(strainWeeklyStats.year, input.year),
+              eq(strainWeeklyStats.week, input.week - 1)
+            ))
+            .limit(1);
+
+          if (lastWeekStat) {
+            lastWeekPoints = lastWeekStat.totalPoints;
+
+            const [twoWeeksAgo] = await db
+              .select()
+              .from(strainWeeklyStats)
+              .where(and(
+                eq(strainWeeklyStats.strainId, pick.assetId),
+                eq(strainWeeklyStats.year, input.year),
+                eq(strainWeeklyStats.week, input.week - 2)
+              ))
+              .limit(1);
+
+            if (twoWeeksAgo && twoWeeksAgo.totalPoints > 0) {
+              trendPercent = ((lastWeekStat.totalPoints - twoWeeksAgo.totalPoints) / twoWeeksAgo.totalPoints) * 100;
+            }
+          }
+        } else if (pick.assetType === 'pharmacy') {
+          const [asset] = await db.select().from(pharmacies).where(eq(pharmacies.id, pick.assetId)).limit(1);
+          assetName = asset?.name || "Unknown";
+
+          const [lastWeekStat] = await db
+            .select()
+            .from(pharmacyWeeklyStats)
+            .where(and(
+              eq(pharmacyWeeklyStats.pharmacyId, pick.assetId),
+              eq(pharmacyWeeklyStats.year, input.year),
+              eq(pharmacyWeeklyStats.week, input.week - 1)
+            ))
+            .limit(1);
+
+          if (lastWeekStat) {
+            lastWeekPoints = lastWeekStat.totalPoints;
+
+            const [twoWeeksAgo] = await db
+              .select()
+              .from(pharmacyWeeklyStats)
+              .where(and(
+                eq(pharmacyWeeklyStats.pharmacyId, pick.assetId),
+                eq(pharmacyWeeklyStats.year, input.year),
+                eq(pharmacyWeeklyStats.week, input.week - 2)
+              ))
+              .limit(1);
+
+            if (twoWeeksAgo && twoWeeksAgo.totalPoints > 0) {
+              trendPercent = ((lastWeekStat.totalPoints - twoWeeksAgo.totalPoints) / twoWeeksAgo.totalPoints) * 100;
+            }
+          }
+        } else if (pick.assetType === 'brand') {
+          const [asset] = await db.select().from(brands).where(eq(brands.id, pick.assetId)).limit(1);
+          assetName = asset?.name || "Unknown";
+
+          const [lastWeekStat] = await db
+            .select()
+            .from(brandWeeklyStats)
+            .where(and(
+              eq(brandWeeklyStats.brandId, pick.assetId),
+              eq(brandWeeklyStats.year, input.year),
+              eq(brandWeeklyStats.week, input.week - 1)
+            ))
+            .limit(1);
+
+          if (lastWeekStat) {
+            lastWeekPoints = lastWeekStat.totalPoints;
+
+            const [twoWeeksAgo] = await db
+              .select()
+              .from(brandWeeklyStats)
+              .where(and(
+                eq(brandWeeklyStats.brandId, pick.assetId),
+                eq(brandWeeklyStats.year, input.year),
+                eq(brandWeeklyStats.week, input.week - 2)
+              ))
+              .limit(1);
+
+            if (twoWeeksAgo && twoWeeksAgo.totalPoints > 0) {
+              trendPercent = ((lastWeekStat.totalPoints - twoWeeksAgo.totalPoints) / twoWeeksAgo.totalPoints) * 100;
+            }
+          }
+        }
+
+        return {
+          pickNumber: pick.pickNumber,
+          round: pick.round,
+          teamId: pick.teamId,
+          teamName: teamMap.get(pick.teamId) || "Unknown Team",
+          assetType: pick.assetType,
+          assetId: pick.assetId,
+          assetName,
+          lastWeekPoints,
+          trendPercent,
+          pickTime: pick.pickTime,
+        };
+      }));
+
+      return enrichedPicks;
     }),
 });
