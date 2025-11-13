@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, readdirSync } from 'fs';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import postgres from 'postgres';
 import dotenv from 'dotenv';
@@ -17,22 +17,47 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-async function runMigration() {
+/**
+ * Run a single migration file
+ */
+async function runMigrationFile(sql: ReturnType<typeof postgres>, migrationPath: string): Promise<void> {
+  console.log(`\n📄 Reading migration file: ${basename(migrationPath)}`);
+  const migrationSQL = readFileSync(migrationPath, 'utf8');
+  
+  console.log('Running migration...');
+  console.log(migrationSQL);
+  
+  await sql.unsafe(migrationSQL);
+  console.log(`✅ Migration ${basename(migrationPath)} completed successfully!`);
+}
+
+/**
+ * Run all migrations in the migrations directory
+ */
+async function runAllMigrations() {
   const sql = postgres(DATABASE_URL, {
     ssl: 'require'
   });
   
   try {
-    console.log('Reading migration file...');
-    const migrationPath = join(__dirname, '../drizzle/migrations/add_league_type.sql');
-    const migrationSQL = readFileSync(migrationPath, 'utf8');
+    const migrationsDir = join(__dirname, '../drizzle/migrations');
+    const files = readdirSync(migrationsDir)
+      .filter(file => file.endsWith('.sql') && file !== '.gitkeep')
+      .sort(); // Run migrations in alphabetical order
     
-    console.log('Running migration...');
-    console.log(migrationSQL);
+    if (files.length === 0) {
+      console.log('No migration files found');
+      return;
+    }
     
-    await sql.unsafe(migrationSQL);
+    console.log(`Found ${files.length} migration file(s)`);
     
-    console.log('✅ Migration completed successfully!');
+    for (const file of files) {
+      const migrationPath = join(migrationsDir, file);
+      await runMigrationFile(sql, migrationPath);
+    }
+    
+    console.log('\n✅ All migrations completed successfully!');
   } catch (error) {
     console.error('❌ Migration failed:', error);
     process.exit(1);
@@ -41,4 +66,37 @@ async function runMigration() {
   }
 }
 
-runMigration();
+/**
+ * Run a specific migration file
+ */
+async function runSpecificMigration(migrationFileName: string) {
+  const sql = postgres(DATABASE_URL, {
+    ssl: 'require'
+  });
+  
+  try {
+    const migrationPath = join(__dirname, '../drizzle/migrations', migrationFileName);
+    await runMigrationFile(sql, migrationPath);
+    console.log('\n✅ Migration completed successfully!');
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+    process.exit(1);
+  } finally {
+    await sql.end();
+  }
+}
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+
+if (args.length === 0) {
+  // Default: run the pharmaceutical product count migration
+  console.log('No migration specified, running add_pharmaceutical_product_count.sql by default');
+  runSpecificMigration('add_pharmaceutical_product_count.sql');
+} else if (args[0] === '--all' || args[0] === '-a') {
+  // Run all migrations
+  runAllMigrations();
+} else {
+  // Run specific migration file
+  runSpecificMigration(args[0]);
+}

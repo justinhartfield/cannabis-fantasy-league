@@ -4,7 +4,8 @@
  * Includes comprehensive logging and error handling
  */
 
-import { getDb, getRawClient } from '../db';
+import { getDb } from '../db';
+import { validateCannabisStrainsSchema } from '../db/schemaValidator';
 import { getMetabaseClient } from '../metabase';
 import { cannabisStrains, brands, manufacturers, pharmacies, strains } from '../../drizzle/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -21,6 +22,21 @@ export class DataSyncServiceV2 {
       await logger.updateJobStatus('running');
       await logger.info('Starting cannabis strains sync...');
       
+      // Validate schema before proceeding
+      try {
+        await logger.info('Validating database schema...');
+        await validateCannabisStrainsSchema();
+        await logger.info('Schema validation passed');
+      } catch (validationError) {
+        const errorMessage = validationError instanceof Error ? validationError.message : String(validationError);
+        await logger.error('Schema validation failed', {
+          error: errorMessage,
+          suggestion: 'Please run the database migration: npm run db:migrate',
+        });
+        await logger.updateJobStatus('failed', `Schema validation failed: ${errorMessage}`);
+        throw new Error(`Schema validation failed: ${errorMessage}. Please run: npm run db:migrate`);
+      }
+      
       const metabase = getMetabaseClient();
       const strainsData = await metabase.fetchCannabisStrains();
       
@@ -30,14 +46,14 @@ export class DataSyncServiceV2 {
       let synced = 0;
       let errors = 0;
 
-      // Get raw postgres client to bypass Drizzle ORM
-      const client = await getRawClient();
-      if (!client) throw new Error('Database client not available');
-
       for (const strain of strainsData) {
         try {
-          // Use raw postgres-js client directly with parameterized query
-          await client`
+          // Use Drizzle's insert with onConflictDoUpdate
+          const db = await getDb();
+          if (!db) throw new Error('Database not available');
+          
+          // Use raw SQL to avoid Drizzle ORM issues with onConflictDoUpdate
+          await db.execute(sql`
             INSERT INTO "cannabisStrains" (
               "metabaseId", "name", "slug", "type", "description",
               "effects", "flavors", "terpenes",
@@ -74,7 +90,7 @@ export class DataSyncServiceV2 {
               "cbdMax" = EXCLUDED."cbdMax",
               "pharmaceuticalProductCount" = EXCLUDED."pharmaceuticalProductCount",
               "updatedAt" = NOW()
-          `;
+          `);
 
           synced++;
           
@@ -84,13 +100,40 @@ export class DataSyncServiceV2 {
           }
         } catch (error) {
           errors++;
-          await logger.error(`Failed to sync strain: ${strain.name}`, {
-            error: error instanceof Error ? error.message : String(error),
+          
+          // Enhanced error handling for PostgreSQL errors
+          const pgError = error as any;
+          const errorCode = pgError?.code;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorDetail = pgError?.detail || pgError?.message;
+          
+          // PostgreSQL error code 42703 = undefined_column
+          // PostgreSQL error code 42P01 = undefined_table
+          const isSchemaError = errorCode === '42703' || errorCode === '42P01';
+          
+          const errorMetadata: Record<string, unknown> = {
+            error: errorMessage,
             errorDetails: error instanceof Error ? error.stack : String(error),
-            errorCode: (error as any)?.code,
-            errorDetail: (error as any)?.detail,
+            errorCode,
+            errorDetail,
             strain: strain.name,
-          });
+          };
+          
+          if (isSchemaError) {
+            errorMetadata.suggestion = 'Database schema mismatch detected. Please run: npm run db:migrate';
+            errorMetadata.errorType = 'schema_mismatch';
+          }
+          
+          await logger.error(`Failed to sync strain: ${strain.name}`, errorMetadata);
+          
+          // If it's a schema error, log it prominently and suggest action
+          if (isSchemaError && errors === 1) {
+            await logger.error(
+              `Schema error detected. This usually means the database schema is out of sync. ` +
+              `Error code: ${errorCode}. Please run migrations: npm run db:migrate`,
+              { errorCode, errorDetail }
+            );
+          }
         }
       }
 
@@ -102,6 +145,8 @@ export class DataSyncServiceV2 {
       await logger.error('Strains sync failed', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
+        errorCode: (error as any)?.code,
+        errorDetail: (error as any)?.detail,
       });
       await logger.updateJobStatus('failed', error instanceof Error ? error.message : 'Unknown error');
       throw error;
