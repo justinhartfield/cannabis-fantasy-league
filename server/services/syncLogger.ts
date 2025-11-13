@@ -3,7 +3,7 @@
  * Handles logging for data sync operations
  */
 
-import { db } from '../db';
+import { getDb } from '../db';
 import { syncJobs, syncLogs } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
@@ -15,6 +15,9 @@ export class SyncLogger {
   }
 
   async info(message: string, metadata?: any) {
+    const db = await getDb();
+    if (!db) return;
+    
     await db.insert(syncLogs).values({
       jobId: this.jobId,
       level: 'info',
@@ -25,6 +28,9 @@ export class SyncLogger {
   }
 
   async warn(message: string, metadata?: any) {
+    const db = await getDb();
+    if (!db) return;
+    
     await db.insert(syncLogs).values({
       jobId: this.jobId,
       level: 'warn',
@@ -35,6 +41,9 @@ export class SyncLogger {
   }
 
   async error(message: string, metadata?: any) {
+    const db = await getDb();
+    if (!db) return;
+    
     await db.insert(syncLogs).values({
       jobId: this.jobId,
       level: 'error',
@@ -45,6 +54,9 @@ export class SyncLogger {
   }
 
   async updateJobStatus(status: string, details?: string, counts?: { processed?: number; total?: number }) {
+    const db = await getDb();
+    if (!db) return;
+    
     const updateData: any = { status };
     
     if (details) updateData.details = details;
@@ -69,6 +81,9 @@ export class SyncLogger {
  * Create a new sync job and return a logger for it
  */
 export async function createSyncJob(jobName: string): Promise<SyncLogger> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
   const [job] = await db.insert(syncJobs).values({
     jobName,
     status: 'pending',

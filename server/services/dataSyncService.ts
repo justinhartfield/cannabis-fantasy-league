@@ -4,7 +4,7 @@
  * Includes comprehensive logging and error handling
  */
 
-import { db } from '../db';
+import { getDb } from '../db';
 import { getMetabaseClient } from '../metabase';
 import { cannabisStrains, brands, manufacturers, pharmacies } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
@@ -33,6 +33,8 @@ export class DataSyncServiceV2 {
       for (const strain of strainsData) {
         try {
           // Use Drizzle's insert with onConflictDoUpdate
+          const db = await getDb();
+          if (!db) throw new Error('Database not available');
           await db.insert(cannabisStrains)
             .values({
               metabaseId: strain.metabaseId,
@@ -119,6 +121,8 @@ export class DataSyncServiceV2 {
       for (const brand of brandsData) {
         try {
           // Use Drizzle's insert with onConflictDoUpdate
+          const db = await getDb();
+          if (!db) throw new Error('Database not available');
           await db.insert(brands)
             .values({
               name: brand.name,
@@ -197,6 +201,8 @@ export class DataSyncServiceV2 {
       for (const mfg of mfgData) {
         try {
           // Check if exists
+          const db = await getDb();
+          if (!db) throw new Error('Database not available');
           const existing = await db
             .select()
             .from(manufacturers)

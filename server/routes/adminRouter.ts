@@ -5,7 +5,7 @@
 
 import { router, protectedProcedure } from '../_core/trpc';
 import { getDataSyncServiceV2 } from '../services/dataSyncService';
-import { db } from '../db';
+import { getDb } from '../db';
 import { syncJobs, syncLogs, cannabisStrains, brands, manufacturers } from '../../drizzle/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -143,7 +143,9 @@ export const adminRouter = router({
         throw new Error('Unauthorized: Admin access required');
       }
 
-      const jobs = await db
+      const db = await getDb();
+    if (!db) throw new Error('Database not available');
+    const jobs = await db
         .select()
         .from(syncJobs)
         .orderBy(desc(syncJobs.createdAt))
@@ -164,6 +166,8 @@ export const adminRouter = router({
         throw new Error('Unauthorized: Admin access required');
       }
 
+      const db = await getDb();
+      if (!db) throw new Error('Database not available');
       const logs = await db
         .select()
         .from(syncLogs)
@@ -182,6 +186,8 @@ export const adminRouter = router({
     }
 
     // Get counts
+    const db = await getDb();
+    if (!db) throw new Error('Database not available');
     const [strainCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(cannabisStrains);
