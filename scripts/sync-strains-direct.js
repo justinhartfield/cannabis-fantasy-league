@@ -21,25 +21,32 @@ async function fetchStrainsFromMetabase() {
     throw new Error('METABASE_API_KEY environment variable not set');
   }
 
-  const response = await fetch(`${METABASE_URL}/api/table/${CANNABIS_STRAIN_TABLE_ID}/query`, {
+  const response = await fetch(`${METABASE_URL}/api/dataset`, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
+      'X-API-KEY': apiKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      limit: 10000,
+      database: 2, // Weed.de Prod DB
+      type: 'query',
+      query: {
+        'source-table': CANNABIS_STRAIN_TABLE_ID,
+        limit: 2000,
+      },
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Metabase API error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Metabase API error: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
   const data = await response.json();
-  console.log(`✅ Fetched ${data.data.rows.length} strains from Metabase`);
+  const rows = data.data.rows || [];
+  console.log(`✅ Fetched ${rows.length} strains from Metabase`);
   
-  return data.data.rows;
+  return rows;
 }
 
 function normalizeStrainName(name) {
