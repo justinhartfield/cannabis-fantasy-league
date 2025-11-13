@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { weeklyLineups, rosters, manufacturers, cannabisStrains, strains, pharmacies, brands } from "../drizzle/schema";
+import { weeklyLineups, weeklyTeamScores, rosters, manufacturers, cannabisStrains, strains, pharmacies, brands } from "../drizzle/schema";
 
 /**
  * Lineup Router
@@ -73,6 +73,19 @@ export const lineupRouter = router({
         };
       }
 
+      // Fetch weekly team scores for this lineup
+      const [teamScores] = await db
+        .select()
+        .from(weeklyTeamScores)
+        .where(
+          and(
+            eq(weeklyTeamScores.teamId, input.teamId),
+            eq(weeklyTeamScores.year, input.year),
+            eq(weeklyTeamScores.week, input.week)
+          )
+        )
+        .limit(1);
+
       // Fetch asset names for lineup
       const fetchAssetName = async (assetType: string | null, assetId: number | null) => {
         if (!assetId || !assetType) return null;
@@ -103,18 +116,18 @@ export const lineupRouter = router({
         }
       };
 
-      // Build lineup array with asset names
+      // Build lineup array with asset names and actual points
       const lineupData = await Promise.all([
-        { position: "MFG1", assetType: "manufacturer" as const, assetId: lineup.mfg1Id, points: 0 },
-        { position: "MFG2", assetType: "manufacturer" as const, assetId: lineup.mfg2Id, points: 0 },
-        { position: "CSTR1", assetType: "cannabis_strain" as const, assetId: lineup.cstr1Id, points: 0 },
-        { position: "CSTR2", assetType: "cannabis_strain" as const, assetId: lineup.cstr2Id, points: 0 },
-        { position: "PRD1", assetType: "product" as const, assetId: lineup.prd1Id, points: 0 },
-        { position: "PRD2", assetType: "product" as const, assetId: lineup.prd2Id, points: 0 },
-        { position: "PHM1", assetType: "pharmacy" as const, assetId: lineup.phm1Id, points: 0 },
-        { position: "PHM2", assetType: "pharmacy" as const, assetId: lineup.phm2Id, points: 0 },
-        { position: "BRD1", assetType: "brand" as const, assetId: lineup.brd1Id, points: 0 },
-        { position: "FLEX", assetType: lineup.flexType, assetId: lineup.flexId, points: 0 },
+        { position: "MFG1", assetType: "manufacturer" as const, assetId: lineup.mfg1Id, points: teamScores?.mfg1Points || 0 },
+        { position: "MFG2", assetType: "manufacturer" as const, assetId: lineup.mfg2Id, points: teamScores?.mfg2Points || 0 },
+        { position: "CSTR1", assetType: "cannabis_strain" as const, assetId: lineup.cstr1Id, points: teamScores?.cstr1Points || 0 },
+        { position: "CSTR2", assetType: "cannabis_strain" as const, assetId: lineup.cstr2Id, points: teamScores?.cstr2Points || 0 },
+        { position: "PRD1", assetType: "product" as const, assetId: lineup.prd1Id, points: teamScores?.prd1Points || 0 },
+        { position: "PRD2", assetType: "product" as const, assetId: lineup.prd2Id, points: teamScores?.prd2Points || 0 },
+        { position: "PHM1", assetType: "pharmacy" as const, assetId: lineup.phm1Id, points: teamScores?.phm1Points || 0 },
+        { position: "PHM2", assetType: "pharmacy" as const, assetId: lineup.phm2Id, points: teamScores?.phm2Points || 0 },
+        { position: "BRD1", assetType: "brand" as const, assetId: lineup.brd1Id, points: teamScores?.brd1Points || 0 },
+        { position: "FLEX", assetType: lineup.flexType, assetId: lineup.flexId, points: teamScores?.flexPoints || 0 },
       ].map(async (slot) => ({
         ...slot,
         assetName: await fetchAssetName(slot.assetType, slot.assetId),
