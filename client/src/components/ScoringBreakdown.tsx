@@ -128,16 +128,6 @@ export default function ScoringBreakdown({
                   <div>
                     <div className="text-sm font-medium text-foreground flex items-center gap-1">
                       {component.category}
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-sm">{component.formula}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {component.formula}
