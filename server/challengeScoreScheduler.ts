@@ -1,7 +1,7 @@
 import { getDb } from './db';
-import { leagues, teams, weeklyTeamScores } from '../drizzle/schema';
+import { leagues, teams, dailyTeamScores } from '../drizzle/schema';
 import { eq, and } from 'drizzle-orm';
-import { calculateWeeklyScores } from './scoringEngine';
+import { calculateDailyChallengeScores } from './scoringEngine';
 import { wsManager } from './websocket';
 
 /**
@@ -106,49 +106,14 @@ class ChallengeScoreScheduler {
 
       console.log(`[ChallengeScoreScheduler] Found ${activeChallenges.length} active challenges to update`);
 
-      const year = now.getFullYear();
-      const week = this.getWeekNumber(now);
-
       for (const challenge of activeChallenges) {
         try {
           console.log(`[ChallengeScoreScheduler] Updating scores for challenge ${challenge.id}`);
-          
-          await calculateWeeklyScores(challenge.id, year, week);
-
-          // Get updated scores for broadcast
-          const challengeTeams = await db
-            .select()
-            .from(teams)
-            .where(eq(teams.leagueId, challenge.id));
-
-          const scores = await Promise.all(
-            challengeTeams.map(async (team) => {
-              const [score] = await db
-                .select()
-                .from(weeklyTeamScores)
-                .where(and(
-                  eq(weeklyTeamScores.teamId, team.id),
-                  eq(weeklyTeamScores.year, year),
-                  eq(weeklyTeamScores.week, week)
-                ))
-                .limit(1);
-
-              return {
-                teamId: team.id,
-                teamName: team.name,
-                points: score?.totalPoints || 0,
-              };
-            })
-          );
-
-          // Broadcast score update via WebSocket
-          wsManager.notifyChallengeScoreUpdate(challenge.id, {
-            challengeId: challenge.id,
-            year,
-            week,
-            scores,
-            updateTime: now.toISOString(),
-          });
+          const statDateString = new Date(challenge.createdAt).toISOString().split('T')[0];
+          const statDateObj = new Date(statDateString);
+          const statYear = statDateObj.getFullYear();
+          const statWeek = this.getWeekNumber(statDateObj);
+          await calculateDailyChallengeScores(challenge.id, statDateString);
 
           console.log(`[ChallengeScoreScheduler] Updated challenge ${challenge.id}`);
         } catch (error) {
@@ -197,17 +162,15 @@ class ChallengeScoreScheduler {
 
       console.log(`[ChallengeScoreScheduler] Found ${challengesToFinalize.length} challenges to finalize`);
 
-      const year = now.getFullYear();
-      const week = this.getWeekNumber(now);
-
       for (const challenge of challengesToFinalize) {
         try {
           console.log(`[ChallengeScoreScheduler] Finalizing challenge ${challenge.id}`);
 
           // Calculate final scores
-          await calculateWeeklyScores(challenge.id, year, week);
+          const statDateString = new Date(challenge.createdAt).toISOString().split('T')[0];
 
-          // Get final scores and determine winner
+          await calculateDailyChallengeScores(challenge.id, statDateString);
+
           const challengeTeams = await db
             .select()
             .from(teams)
@@ -217,11 +180,11 @@ class ChallengeScoreScheduler {
             challengeTeams.map(async (team) => {
               const [score] = await db
                 .select()
-                .from(weeklyTeamScores)
+                .from(dailyTeamScores)
                 .where(and(
-                  eq(weeklyTeamScores.teamId, team.id),
-                  eq(weeklyTeamScores.year, year),
-                  eq(weeklyTeamScores.week, week)
+                  eq(dailyTeamScores.teamId, team.id),
+                  eq(dailyTeamScores.challengeId, challenge.id),
+                  eq(dailyTeamScores.statDate, statDateString)
                 ))
                 .limit(1);
 
@@ -249,8 +212,9 @@ class ChallengeScoreScheduler {
           // Broadcast finalization event via WebSocket
           wsManager.notifyChallengeFinalized(challenge.id, {
             challengeId: challenge.id,
-            year,
-            week,
+            year: statYear,
+            week: statWeek,
+            statDate: statDateString,
             scores: finalScores.map(s => ({ teamId: s.teamId, teamName: s.teamName, points: s.points })),
             winner: {
               teamId: winner.teamId,
@@ -292,11 +256,9 @@ class ChallengeScoreScheduler {
       throw new Error('Challenge not found');
     }
 
-    const challengeDate = new Date(challenge.createdAt);
-    const year = challengeDate.getFullYear();
-    const week = this.getWeekNumber(challengeDate);
+    const statDateString = new Date(challenge.createdAt).toISOString().split('T')[0];
 
-    await calculateWeeklyScores(challengeId, year, week);
+    await calculateDailyChallengeScores(challengeId, statDateString);
   }
 
   /**

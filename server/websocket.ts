@@ -363,6 +363,7 @@ class WebSocketManager {
     challengeId: number;
     year: number;
     week: number;
+    statDate?: string;
     scores: Array<{ teamId: number; teamName: string; points: number }>;
     updateTime: string;
   }) {
@@ -377,6 +378,7 @@ class WebSocketManager {
     challengeId: number;
     year: number;
     week: number;
+    statDate?: string;
     scores: Array<{ teamId: number; teamName: string; points: number }>;
     winner: {
       teamId: number;

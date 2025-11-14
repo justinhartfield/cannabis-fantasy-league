@@ -18,6 +18,11 @@ import {
   pharmacyWeeklyStats,
   brandWeeklyStats,
   strainWeeklyStats,
+  manufacturerDailyStats,
+  cannabisStrainDailyStats,
+  strainDailyStats,
+  pharmacyDailyStats,
+  brandDailyStats,
 } from '../../drizzle/schema';
 import { eq, sql, and } from 'drizzle-orm';
 import { createSyncJob, SyncLogger } from './syncLogger';
@@ -703,6 +708,238 @@ export class DataSyncServiceV2 {
       return counts;
     } catch (error) {
       await logger.error('Weekly stats sync failed', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      await logger.updateJobStatus('failed', error instanceof Error ? error.message : 'Unknown error');
+      throw error;
+    }
+  }
+
+  /**
+   * Sync daily stats snapshot for all asset types
+   */
+  async syncDailyStats(targetDate?: string): Promise<void> {
+    const logger = await createSyncJob('sync-daily-stats');
+
+    try {
+      await logger.updateJobStatus('running');
+
+      const db = await getDb();
+      if (!db) throw new Error('Database not available');
+
+      const dateInput = targetDate ? new Date(`${targetDate}T00:00:00Z`) : new Date();
+      if (Number.isNaN(dateInput.getTime())) {
+        throw new Error(`Invalid date provided: ${targetDate}`);
+      }
+      const statDate = dateInput.toISOString().split('T')[0];
+
+      await logger.info(`Starting daily stats sync for ${statDate}...`);
+
+      const counts = {
+        manufacturers: 0,
+        cannabisStrains: 0,
+        products: 0,
+        pharmacies: 0,
+        brands: 0,
+      };
+
+      // Manufacturers
+      await logger.info('Syncing manufacturer daily stats...');
+      const manufacturerData = await db.select().from(manufacturers);
+      for (const mfg of manufacturerData) {
+        const salesVolumeGrams = Math.max(10, (mfg.productCount || 0) * 25 + Math.floor(Math.random() * 50));
+        const growthRatePercent = Math.floor(Math.random() * 10) - 2;
+        const rankChange = Math.floor(Math.random() * 3) - 1;
+
+        await db.insert(manufacturerDailyStats)
+          .values({
+            manufacturerId: mfg.id,
+            statDate,
+            salesVolumeGrams,
+            growthRatePercent,
+            marketShareRank: mfg.currentRank || mfg.id,
+            rankChange,
+            productCount: mfg.productCount || 0,
+            totalPoints: 0,
+          })
+          .onConflictDoUpdate({
+            target: [manufacturerDailyStats.manufacturerId, manufacturerDailyStats.statDate],
+            set: {
+              salesVolumeGrams,
+              growthRatePercent,
+              marketShareRank: mfg.currentRank || mfg.id,
+              rankChange,
+              productCount: mfg.productCount || 0,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+
+        counts.manufacturers++;
+      }
+
+      // Cannabis strains (genetics)
+      await logger.info('Syncing cannabis strain daily stats...');
+      const cannabisStrainData = await db.select().from(cannabisStrains);
+      for (const strain of cannabisStrainData) {
+        const favorites = Math.max(0, (strain.thcMax || 0) * 5 + Math.floor(Math.random() * 20));
+        const pharmacyCount = strain.pharmaceuticalProductCount || 0;
+
+        await db.insert(cannabisStrainDailyStats)
+          .values({
+            cannabisStrainId: strain.id,
+            statDate,
+            totalFavorites: favorites,
+            pharmacyCount,
+            productCount: pharmacyCount,
+            avgPriceCents: 1000,
+            priceChange: Math.floor(Math.random() * 6) - 3,
+            marketPenetration: Math.min(100, pharmacyCount * 2),
+            totalPoints: 0,
+          })
+          .onConflictDoUpdate({
+            target: [cannabisStrainDailyStats.cannabisStrainId, cannabisStrainDailyStats.statDate],
+            set: {
+              totalFavorites: favorites,
+              pharmacyCount,
+              productCount: pharmacyCount,
+              priceChange: Math.floor(Math.random() * 6) - 3,
+              marketPenetration: Math.min(100, pharmacyCount * 2),
+              updatedAt: new Date().toISOString(),
+            },
+          });
+
+        counts.cannabisStrains++;
+      }
+
+      // Products
+      await logger.info('Syncing product daily stats...');
+      const productData = await db.select().from(strains).limit(300);
+      for (const product of productData) {
+        const favoriteGrowth = Math.floor(Math.random() * 10);
+        const pharmacyExpansion = Math.floor(Math.random() * 3);
+
+        await db.insert(strainDailyStats)
+          .values({
+            strainId: product.id,
+            statDate,
+            favoriteCount: product.favoriteCount || 0,
+            favoriteGrowth,
+            pharmacyCount: product.pharmacyCount || 0,
+            pharmacyExpansion,
+            avgPriceCents: product.avgPriceCents || 0,
+            priceStability: 80 + Math.floor(Math.random() * 20),
+            orderVolumeGrams: Math.max(0, (product.favoriteCount || 0) * 2),
+            totalPoints: 0,
+          })
+          .onConflictDoUpdate({
+            target: [strainDailyStats.strainId, strainDailyStats.statDate],
+            set: {
+              favoriteCount: product.favoriteCount || 0,
+              favoriteGrowth,
+              pharmacyCount: product.pharmacyCount || 0,
+              pharmacyExpansion,
+              avgPriceCents: product.avgPriceCents || 0,
+              priceStability: 80 + Math.floor(Math.random() * 20),
+              orderVolumeGrams: Math.max(0, (product.favoriteCount || 0) * 2),
+              updatedAt: new Date().toISOString(),
+            },
+          });
+
+        counts.products++;
+      }
+
+      // Pharmacies
+      await logger.info('Syncing pharmacy daily stats...');
+      const pharmacyData = await db.select().from(pharmacies);
+      for (const pharmacy of pharmacyData) {
+        const revenueCents = Math.max(0, (pharmacy.weeklyRevenueCents || 0) / 7);
+        const orderCount = Math.max(0, Math.round((pharmacy.weeklyOrderCount || 0) / 7));
+
+        await db.insert(pharmacyDailyStats)
+          .values({
+            pharmacyId: pharmacy.id,
+            statDate,
+            revenueCents: Math.round(revenueCents),
+            orderCount,
+            avgOrderSizeGrams: pharmacy.avgOrderSizeGrams || 0,
+            customerRetentionRate: pharmacy.customerRetentionRate || 0,
+            productVariety: pharmacy.productCount || 0,
+            appUsageRate: pharmacy.appUsageRate || 0,
+            growthRatePercent: Math.floor(Math.random() * 10) - 3,
+            totalPoints: 0,
+          })
+          .onConflictDoUpdate({
+            target: [pharmacyDailyStats.pharmacyId, pharmacyDailyStats.statDate],
+            set: {
+              revenueCents: Math.round(revenueCents),
+              orderCount,
+              avgOrderSizeGrams: pharmacy.avgOrderSizeGrams || 0,
+              customerRetentionRate: pharmacy.customerRetentionRate || 0,
+              productVariety: pharmacy.productCount || 0,
+              appUsageRate: pharmacy.appUsageRate || 0,
+              growthRatePercent: Math.floor(Math.random() * 10) - 3,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+
+        counts.pharmacies++;
+      }
+
+      // Brands
+      await logger.info('Syncing brand daily stats...');
+      const brandData = await db.select().from(brands);
+      for (const brand of brandData) {
+        const views = Math.floor((brand.totalViews || 0) / 50 + Math.random() * 200);
+        const favorites = Math.floor((brand.totalFavorites || 0) / 50 + Math.random() * 30);
+        const comments = Math.floor(Math.random() * 10);
+        const clicks = Math.floor(Math.random() * 15);
+
+        await db.insert(brandDailyStats)
+          .values({
+            brandId: brand.id,
+            statDate,
+            favorites,
+            favoriteGrowth: Math.floor(Math.random() * 5),
+            views,
+            viewGrowth: Math.floor(Math.random() * 20),
+            comments,
+            commentGrowth: Math.floor(Math.random() * 5),
+            affiliateClicks: clicks,
+            clickGrowth: Math.floor(Math.random() * 5),
+            engagementRate: views > 0 ? Math.round(((favorites + comments) / views) * 100) : 0,
+            sentimentScore: 0,
+            totalPoints: 0,
+          })
+          .onConflictDoUpdate({
+            target: [brandDailyStats.brandId, brandDailyStats.statDate],
+            set: {
+              favorites,
+              favoriteGrowth: Math.floor(Math.random() * 5),
+              views,
+              viewGrowth: Math.floor(Math.random() * 20),
+              comments,
+              commentGrowth: Math.floor(Math.random() * 5),
+              affiliateClicks: clicks,
+              clickGrowth: Math.floor(Math.random() * 5),
+              engagementRate: views > 0 ? Math.round(((favorites + comments) / views) * 100) : 0,
+              sentimentScore: 0,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+
+        counts.brands++;
+      }
+
+      await logger.info(
+        `Daily stats sync complete for ${statDate}: ` +
+        `${counts.manufacturers} manufacturers, ${counts.cannabisStrains} cannabis strains, ` +
+        `${counts.products} products, ${counts.pharmacies} pharmacies, ${counts.brands} brands`
+      );
+
+      await logger.updateJobStatus('completed', `Daily stats synced for ${statDate}`);
+    } catch (error) {
+      await logger.error('Daily stats sync failed', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });

@@ -677,7 +677,8 @@ export async function sendDailyChallengeReminder(params: {
     
     <div class="message">
       <p>Select your 10 best-performing assets to compete for today's victory.</p>
-      <p>Assets are sorted by yesterday's scores to help you make the best choices.</p>
+      <p>Scores update hourly based on today's real-world stats, so every lineup tweak can swing the battle.</p>
+      <p>Assets are sorted by the latest daily numbers to help you make the best choices.</p>
     </div>
     
     <div style="text-align: center; margin: 30px 0;">

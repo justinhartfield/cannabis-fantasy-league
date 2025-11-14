@@ -71,31 +71,43 @@ export default function DailyChallenge() {
 
   const currentYear = league?.seasonYear || new Date().getFullYear();
   const currentWeek = league?.currentWeek || 1;
+  const statDate = useMemo(() => {
+    if (!league?.createdAt) return null;
+    return new Date(league.createdAt).toISOString().split('T')[0];
+  }, [league]);
+  const challengeDateLabel = useMemo(() => {
+    if (!statDate) return new Date().toLocaleDateString();
+    return new Date(statDate).toLocaleDateString();
+  }, [statDate]);
+  const isTodayChallenge = useMemo(() => {
+    if (!statDate) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return statDate === today;
+  }, [statDate]);
 
   const {
-    data: weekScores,
+    data: dayScores,
     isLoading: scoresLoading,
     refetch: refetchScores,
-  } = trpc.scoring.getLeagueWeekScores.useQuery(
+  } = trpc.scoring.getChallengeDayScores.useQuery(
     {
-      leagueId: challengeId,
-      year: currentYear,
-      week: currentWeek,
+      challengeId,
+      statDate: statDate || '',
     },
-    { enabled: !!league }
+    { enabled: !!league && !!statDate }
   );
 
   const {
     data: breakdown,
     isLoading: breakdownLoading,
-  } = trpc.scoring.getTeamBreakdown.useQuery(
+  } = trpc.scoring.getChallengeDayBreakdown.useQuery(
     {
+      challengeId,
       teamId: selectedTeamId || 0,
-      year: currentYear,
-      week: currentWeek,
+      statDate: statDate || '',
     },
     {
-      enabled: !!selectedTeamId,
+      enabled: !!selectedTeamId && !!statDate,
     }
   );
 
@@ -117,7 +129,7 @@ export default function DailyChallenge() {
     }
   );
 
-  const calculateScoresMutation = trpc.scoring.calculateLeagueWeek.useMutation({
+  const calculateChallengeDayMutation = trpc.scoring.calculateChallengeDay.useMutation({
     onSuccess: () => {
       toast.success("Scores calculated successfully!");
       refetchScores();
@@ -162,10 +174,16 @@ export default function DailyChallenge() {
     teamId: userTeamId,
     onMessage: (message) => {
       if (message.type === 'challenge_score_update') {
+        if (message.statDate && statDate && message.statDate !== statDate) {
+          return;
+        }
         setLastUpdateTime(new Date(message.updateTime));
         refetchScores();
         toast.info("Scores updated!");
       } else if (message.type === 'challenge_finalized') {
+        if (message.statDate && statDate && message.statDate !== statDate) {
+          return;
+        }
         setWinner(message.winner);
         setLastUpdateTime(new Date(message.finalizedAt));
         refetchScores();
@@ -228,27 +246,26 @@ export default function DailyChallenge() {
 
   // Calculate scores on page load as fallback
   useEffect(() => {
-    if (league && league.leagueType === 'challenge' && league.status === 'active' && !isCalculating) {
-      // Trigger score calculation on load to ensure accuracy
-      const challengeDate = new Date(league.createdAt);
-      const now = new Date();
-      // Only calculate if challenge was created today
-      if (challengeDate.toDateString() === now.toDateString()) {
-        calculateScoresMutation.mutate({
-          leagueId: challengeId,
-          year: currentYear,
-          week: currentWeek,
-        });
-      }
+    if (
+      league &&
+      league.leagueType === 'challenge' &&
+      league.status === 'active' &&
+      !isCalculating &&
+      statDate &&
+      isTodayChallenge
+    ) {
+      calculateChallengeDayMutation.mutate({
+        challengeId,
+        statDate,
+      });
     }
-  }, [league, challengeId, currentYear, currentWeek]);
+  }, [league, challengeId, statDate, isTodayChallenge, isCalculating]);
 
   const handleCalculateScores = () => {
     setIsCalculating(true);
-    calculateScoresMutation.mutate({
-      leagueId: challengeId,
-      year: currentYear,
-      week: currentWeek,
+    calculateChallengeDayMutation.mutate({
+      challengeId,
+      statDate: statDate || new Date().toISOString().split('T')[0],
     });
   };
 
@@ -279,14 +296,14 @@ export default function DailyChallenge() {
   }, [league, challengeId, setLocation]);
 
   useEffect(() => {
-    if (weekScores && weekScores.length > 0 && !selectedTeamId) {
-      setSelectedTeamId(weekScores[0].teamId);
+    if (dayScores && dayScores.length > 0 && !selectedTeamId) {
+      setSelectedTeamId(dayScores[0].teamId);
     }
-  }, [weekScores, selectedTeamId]);
+  }, [dayScores, selectedTeamId]);
 
   const sortedScores: TeamScore[] = useMemo(() => {
-    if (!weekScores) return [];
-    return [...weekScores]
+    if (!dayScores) return [];
+    return [...dayScores]
       .map((score, index) => ({
         teamId: score.teamId,
         teamName: score.teamName,
@@ -294,7 +311,7 @@ export default function DailyChallenge() {
         rank: index + 1,
       }))
       .sort((a, b) => (b.points || 0) - (a.points || 0));
-  }, [weekScores]);
+  }, [dayScores]);
 
   // Check for winner when challenge is complete (after sortedScores is defined)
   useEffect(() => {
@@ -421,14 +438,14 @@ export default function DailyChallenge() {
                 {league.name}
               </h1>
               <p className="text-muted-foreground text-sm">
-                Daily Challenge • {new Date().toLocaleDateString()}
+                Daily Challenge • {challengeDateLabel}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {isLive ? <LiveIndicator size="sm" /> : <Badge variant="outline">Final</Badge>}
             <Badge variant="secondary">
-              Woche {currentWeek} • {currentYear}
+              {challengeDateLabel}
             </Badge>
           </div>
         </div>
@@ -613,7 +630,7 @@ export default function DailyChallenge() {
             },
             {
               label: "Aktive Teams",
-              value: weekScores?.length || 0,
+              value: dayScores?.length || 0,
               icon: Sparkles,
               variant: "secondary" as const,
             },
@@ -655,9 +672,9 @@ export default function DailyChallenge() {
                   size="sm"
                   className="border-border/50"
                   onClick={handleCalculateScores}
-                  disabled={isCalculating || calculateScoresMutation.isPending}
+                  disabled={isCalculating || calculateChallengeDayMutation.isPending}
                 >
-                  {isCalculating || calculateScoresMutation.isPending ? (
+                  {isCalculating || calculateChallengeDayMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Calc...

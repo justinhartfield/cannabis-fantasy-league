@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, text, timestamp, json, index, primaryKey, unique, decimal } from "drizzle-orm/pg-core"
+import { pgTable, serial, integer, varchar, text, timestamp, json, index, primaryKey, unique, decimal, date } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const achievements = pgTable("achievements", {
@@ -55,6 +55,29 @@ export const brandWeeklyStats = pgTable("brandWeeklyStats", {
 	unique("brand_week_unique").on(table.brandId, table.year, table.week),
 ]);
 
+export const brandDailyStats = pgTable("brandDailyStats", {
+	id: serial().notNull(),
+	brandId: integer().notNull(),
+	statDate: date({ mode: 'string' }).notNull(),
+	favorites: integer().default(0).notNull(),
+	favoriteGrowth: integer().default(0).notNull(),
+	views: integer().default(0).notNull(),
+	viewGrowth: integer().default(0).notNull(),
+	comments: integer().default(0).notNull(),
+	commentGrowth: integer().default(0).notNull(),
+	affiliateClicks: integer().default(0).notNull(),
+	clickGrowth: integer().default(0).notNull(),
+	engagementRate: integer().default(0).notNull(),
+	sentimentScore: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("brand_daily_date_idx").on(table.statDate),
+	unique("brand_daily_unique").on(table.brandId, table.statDate),
+]);
+
 export const cannabisStrainWeeklyStats = pgTable("cannabisStrainWeeklyStats", {
 	id: serial().notNull(),
 	cannabisStrainId: integer().notNull(),
@@ -72,6 +95,25 @@ export const cannabisStrainWeeklyStats = pgTable("cannabisStrainWeeklyStats", {
 (table) => [
 	index("cannabis_strain_week_idx").on(table.year, table.week),
 	unique("cannabis_strain_week_unique").on(table.cannabisStrainId, table.year, table.week),
+]);
+
+export const cannabisStrainDailyStats = pgTable("cannabisStrainDailyStats", {
+	id: serial().notNull(),
+	cannabisStrainId: integer().notNull(),
+	statDate: date({ mode: 'string' }).notNull(),
+	totalFavorites: integer().default(0).notNull(),
+	pharmacyCount: integer().default(0).notNull(),
+	productCount: integer().default(0).notNull(),
+	avgPriceCents: integer().default(0).notNull(),
+	priceChange: integer().default(0).notNull(),
+	marketPenetration: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("cannabis_strain_daily_date_idx").on(table.statDate),
+	unique("cannabis_strain_daily_unique").on(table.cannabisStrainId, table.statDate),
 ]);
 
 export const cannabisStrains = pgTable("cannabisStrains", {
@@ -214,6 +256,24 @@ export const manufacturerWeeklyStats = pgTable("manufacturerWeeklyStats", {
 	unique("manufacturer_week_unique").on(table.manufacturerId, table.year, table.week),
 ]);
 
+export const manufacturerDailyStats = pgTable("manufacturerDailyStats", {
+	id: serial().notNull(),
+	manufacturerId: integer().notNull(),
+	statDate: date({ mode: 'string' }).notNull(),
+	salesVolumeGrams: integer().default(0).notNull(),
+	growthRatePercent: integer().default(0).notNull(),
+	marketShareRank: integer().default(0).notNull(),
+	rankChange: integer().default(0).notNull(),
+	productCount: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("manufacturer_daily_date_idx").on(table.statDate),
+	unique("manufacturer_daily_unique").on(table.manufacturerId, table.statDate),
+]);
+
 export const manufacturers = pgTable("manufacturers", {
 	id: serial().notNull(),
 	name: varchar({ length: 255 }).notNull(),
@@ -287,6 +347,26 @@ export const pharmacyWeeklyStats = pgTable("pharmacyWeeklyStats", {
 	unique("pharmacy_week_unique").on(table.pharmacyId, table.year, table.week),
 ]);
 
+export const pharmacyDailyStats = pgTable("pharmacyDailyStats", {
+	id: serial().notNull(),
+	pharmacyId: integer().notNull(),
+	statDate: date({ mode: 'string' }).notNull(),
+	revenueCents: integer().default(0).notNull(),
+	orderCount: integer().default(0).notNull(),
+	avgOrderSizeGrams: integer().default(0).notNull(),
+	customerRetentionRate: integer().default(0).notNull(),
+	productVariety: integer().default(0).notNull(),
+	appUsageRate: integer().default(0).notNull(),
+	growthRatePercent: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("pharmacy_daily_date_idx").on(table.statDate),
+	unique("pharmacy_daily_unique").on(table.pharmacyId, table.statDate),
+]);
+
 export const rosters = pgTable("rosters", {
 	id: serial().notNull(),
 	teamId: integer().notNull(),
@@ -313,6 +393,20 @@ export const scoringBreakdowns = pgTable("scoringBreakdowns", {
 (table) => [
 ]);
 
+export const dailyScoringBreakdowns = pgTable("dailyScoringBreakdowns", {
+	id: serial().notNull(),
+	dailyTeamScoreId: integer().notNull(),
+	assetType: varchar({ length: 50 }).notNull(),
+	assetId: integer().notNull(),
+	position: varchar({ length: 20 }).notNull(),
+	breakdown: json().notNull(),
+	totalPoints: integer().notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+]);
+
 export const strainWeeklyStats = pgTable("strainWeeklyStats", {
 	id: serial().notNull(),
 	strainId: integer().notNull(),
@@ -331,6 +425,26 @@ export const strainWeeklyStats = pgTable("strainWeeklyStats", {
 (table) => [
 	index("strain_week_idx").on(table.year, table.week),
 	unique("strain_week_unique").on(table.strainId, table.year, table.week),
+]);
+
+export const strainDailyStats = pgTable("strainDailyStats", {
+	id: serial().notNull(),
+	strainId: integer().notNull(),
+	statDate: date({ mode: 'string' }).notNull(),
+	favoriteCount: integer().default(0).notNull(),
+	favoriteGrowth: integer().default(0).notNull(),
+	pharmacyCount: integer().default(0).notNull(),
+	pharmacyExpansion: integer().default(0).notNull(),
+	avgPriceCents: integer().default(0).notNull(),
+	priceStability: integer().default(0).notNull(),
+	orderVolumeGrams: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("strain_daily_date_idx").on(table.statDate),
+	unique("strain_daily_unique").on(table.strainId, table.statDate),
 ]);
 
 export const strains = pgTable("strains", {
@@ -476,6 +590,33 @@ export const weeklyTeamScores = pgTable("weeklyTeamScores", {
 },
 (table) => [
 	unique("weekly_team_scores_team_week_unique").on(table.teamId, table.year, table.week),
+]);
+
+export const dailyTeamScores = pgTable("dailyTeamScores", {
+	id: serial().notNull(),
+	challengeId: integer().notNull(),
+	teamId: integer().notNull(),
+	statDate: date({ mode: 'string' }).notNull(),
+	mfg1Points: integer().default(0).notNull(),
+	mfg2Points: integer().default(0).notNull(),
+	cstr1Points: integer().default(0).notNull(),
+	cstr2Points: integer().default(0).notNull(),
+	prd1Points: integer().default(0).notNull(),
+	prd2Points: integer().default(0).notNull(),
+	phm1Points: integer().default(0).notNull(),
+	phm2Points: integer().default(0).notNull(),
+	brd1Points: integer().default(0).notNull(),
+	flexPoints: integer().default(0).notNull(),
+	bonusPoints: integer().default(0).notNull(),
+	penaltyPoints: integer().default(0).notNull(),
+	totalPoints: integer().default(0).notNull(),
+	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+},
+(table) => [
+	index("daily_scores_date_idx").on(table.statDate),
+	index("daily_scores_challenge_idx").on(table.challengeId),
+	unique("daily_scores_unique").on(table.challengeId, table.teamId, table.statDate),
 ]);
 
 

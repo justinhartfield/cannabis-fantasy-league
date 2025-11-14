@@ -121,7 +121,8 @@ export async function generateLineupFromRoster(
 export async function getOrCreateLineup(
   teamId: number,
   year: number,
-  week: number
+  week: number,
+  _options?: { mode?: 'weekly' | 'daily'; statDate?: string }
 ): Promise<any | null> {
   const db = await getDb();
   if (!db) {

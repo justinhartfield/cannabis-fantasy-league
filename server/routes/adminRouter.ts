@@ -102,6 +102,39 @@ export const adminRouter = router({
   }),
 
   /**
+   * Trigger daily stats sync
+   */
+  syncDailyStats: protectedProcedure
+    .input(z.object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }).default({}))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      const syncService = getDataSyncServiceV2();
+
+      try {
+        syncService.syncDailyStats(input.date).catch(err => {
+          console.error('[Admin] Daily stats sync background error:', err);
+        });
+
+        return {
+          success: true,
+          message: `Daily stats sync started for ${input.date || 'today'}`,
+        };
+      } catch (error) {
+        console.error('[Admin] Failed to start daily stats sync:', error);
+        return {
+          success: false,
+          message: 'Failed to start daily stats sync',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }),
+
+  /**
    * Trigger products sync
    */
   syncProducts: protectedProcedure.mutation(async ({ ctx }) => {

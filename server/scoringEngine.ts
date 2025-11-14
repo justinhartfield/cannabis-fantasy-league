@@ -21,6 +21,14 @@ import {
   weeklyTeamScores,
   scoringBreakdowns,
   teams,
+  leagues,
+  manufacturerDailyStats,
+  strainDailyStats,
+  cannabisStrainDailyStats,
+  pharmacyDailyStats,
+  brandDailyStats,
+  dailyTeamScores,
+  dailyScoringBreakdowns,
 } from '../drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { wsManager } from './websocket';
@@ -131,6 +139,23 @@ export function calculateManufacturerPoints(stats: {
     points: breakdown.total,
     breakdown,
   };
+}
+
+type ScoreScope =
+  | { type: 'weekly'; year: number; week: number }
+  | { type: 'daily'; statDate: string };
+
+type TeamScorePersistence =
+  | { mode: 'weekly'; teamId: number; year: number; week: number }
+  | { mode: 'daily'; teamId: number; challengeId: number; statDate: string };
+
+function getIsoYearWeek(date: Date): { year: number; week: number } {
+  const tempDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = tempDate.getUTCDay() || 7;
+  tempDate.setUTCDate(tempDate.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return { year: tempDate.getUTCFullYear(), week };
 }
 
 /**
@@ -536,7 +561,6 @@ export async function calculateWeeklyScores(leagueId: number, year: number, week
   }
 
   try {
-    // Get all teams in the league
     const leagueTeams = await db
       .select()
       .from(teams)
@@ -555,7 +579,6 @@ export async function calculateWeeklyScores(leagueId: number, year: number, week
           points,
         });
         
-        // Broadcast individual team score update
         wsManager.broadcastToLeague(leagueId, {
           type: 'team_score_calculated',
           teamId: team.id,
@@ -570,7 +593,6 @@ export async function calculateWeeklyScores(leagueId: number, year: number, week
       }
     }
 
-    // Broadcast final scores update with all teams
     wsManager.notifyScoresUpdated(leagueId, {
       week,
       year,
@@ -589,20 +611,125 @@ export async function calculateWeeklyScores(leagueId: number, year: number, week
  * Calculate score for a single team for a specific week
  */
 export async function calculateTeamScore(teamId: number, year: number, week: number): Promise<number> {
+  return computeTeamScore({
+    teamId,
+    lineupYear: year,
+    lineupWeek: week,
+    scope: { type: 'weekly', year, week },
+    persistence: { mode: 'weekly', teamId, year, week },
+  });
+}
+
+/**
+ * Calculate score for a single team for a specific challenge day
+ */
+export async function calculateTeamDailyScore(teamId: number, challengeId: number, statDate: string): Promise<number> {
+  const normalizedDate = new Date(`${statDate}T00:00:00Z`);
+  if (Number.isNaN(normalizedDate.getTime())) {
+    throw new Error(`Invalid stat date: ${statDate}`);
+  }
+  const { year, week } = getIsoYearWeek(normalizedDate);
+  const dateString = normalizedDate.toISOString().split('T')[0];
+
+  return computeTeamScore({
+    teamId,
+    lineupYear: year,
+    lineupWeek: week,
+    scope: { type: 'daily', statDate: dateString },
+    persistence: { mode: 'daily', teamId, challengeId, statDate: dateString },
+  });
+}
+
+/**
+ * Calculate scores for a daily challenge on a specific date
+ */
+export async function calculateDailyChallengeScores(challengeId: number, statDate?: string): Promise<void> {
   const db = await getDb();
   if (!db) {
     throw new Error('Database not available');
   }
 
-  // Get or create the team's lineup for this week (auto-generates from roster if not set)
-  const teamLineup = await getOrCreateLineup(teamId, year, week);
+  const challenge = await db.select().from(leagues).where(eq(leagues.id, challengeId)).limit(1);
+  if (challenge.length === 0) {
+    throw new Error('Challenge not found');
+  }
+
+  const targetDate = statDate
+    ? new Date(`${statDate}T00:00:00Z`)
+    : new Date(challenge[0].createdAt);
+
+  if (Number.isNaN(targetDate.getTime())) {
+    throw new Error(`Invalid challenge stat date: ${statDate}`);
+  }
+
+  const statDateString = targetDate.toISOString().split('T')[0];
+
+  const challengeTeams = await db
+    .select()
+    .from(teams)
+    .where(eq(teams.leagueId, challengeId));
+
+  for (const team of challengeTeams) {
+    try {
+      await calculateTeamDailyScore(team.id, challengeId, statDateString);
+    } catch (error) {
+      console.error(`[Scoring] Error calculating daily score for team ${team.id}:`, error);
+    }
+  }
+
+  const scores = await db
+    .select({
+      teamId: dailyTeamScores.teamId,
+      teamName: teams.name,
+      points: dailyTeamScores.totalPoints,
+    })
+    .from(dailyTeamScores)
+    .innerJoin(teams, eq(teams.id, dailyTeamScores.teamId))
+    .where(and(
+      eq(dailyTeamScores.challengeId, challengeId),
+      eq(dailyTeamScores.statDate, statDateString)
+    ));
+
+  const { year, week } = getIsoYearWeek(targetDate);
+
+  wsManager.notifyChallengeScoreUpdate(challengeId, {
+    challengeId,
+    year,
+    week,
+    statDate: statDateString,
+    scores,
+    updateTime: new Date().toISOString(),
+  });
+}
+
+interface TeamScoreComputationOptions {
+  teamId: number;
+  lineupYear: number;
+  lineupWeek: number;
+  scope: ScoreScope;
+  persistence: TeamScorePersistence;
+}
+
+async function computeTeamScore(options: TeamScoreComputationOptions): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error('Database not available');
+  }
+
+  const teamLineup = await getOrCreateLineup(
+    options.teamId,
+    options.lineupYear,
+    options.lineupWeek,
+    options.persistence.mode === 'daily'
+      ? { mode: 'daily', statDate: options.persistence.statDate }
+      : { mode: 'weekly' }
+  );
 
   if (!teamLineup) {
-    console.log(`[Scoring] No lineup available for team ${teamId}, ${year}-W${week} (no roster)`);
+    console.log(`[Scoring] No lineup available for team ${options.teamId}, ctx=${options.lineupYear}-W${options.lineupWeek}`);
     return 0;
   }
 
-  // Calculate points for each position (10 total)
   const positionPoints = {
     mfg1: 0,
     mfg2: 0,
@@ -618,202 +745,311 @@ export async function calculateTeamScore(teamId: number, year: number, week: num
 
   const breakdowns: any[] = [];
 
-  // Score manufacturers
+  const scope = options.scope;
+
   if (teamLineup.mfg1Id) {
-    const result = await scoreManufacturer(teamLineup.mfg1Id, year, week);
+    const result = await scoreManufacturer(teamLineup.mfg1Id, scope);
     positionPoints.mfg1 = result.points;
     breakdowns.push({ position: 'MFG1', assetType: 'manufacturer', assetId: teamLineup.mfg1Id, ...result });
   }
 
   if (teamLineup.mfg2Id) {
-    const result = await scoreManufacturer(teamLineup.mfg2Id, year, week);
+    const result = await scoreManufacturer(teamLineup.mfg2Id, scope);
     positionPoints.mfg2 = result.points;
     breakdowns.push({ position: 'MFG2', assetType: 'manufacturer', assetId: teamLineup.mfg2Id, ...result });
   }
 
-  // Score cannabis strains (genetics/cultivars)
   if (teamLineup.cstr1Id) {
-    const result = await scoreCannabisStrain(teamLineup.cstr1Id, year, week);
+    const result = await scoreCannabisStrain(teamLineup.cstr1Id, scope);
     positionPoints.cstr1 = result.points;
     breakdowns.push({ position: 'CSTR1', assetType: 'cannabis_strain', assetId: teamLineup.cstr1Id, ...result });
   }
 
   if (teamLineup.cstr2Id) {
-    const result = await scoreCannabisStrain(teamLineup.cstr2Id, year, week);
+    const result = await scoreCannabisStrain(teamLineup.cstr2Id, scope);
     positionPoints.cstr2 = result.points;
     breakdowns.push({ position: 'CSTR2', assetType: 'cannabis_strain', assetId: teamLineup.cstr2Id, ...result });
   }
 
-  // Score products (pharmaceutical products)
   if (teamLineup.prd1Id) {
-    const result = await scoreProduct(teamLineup.prd1Id, year, week);
+    const result = await scoreProduct(teamLineup.prd1Id, scope);
     positionPoints.prd1 = result.points;
     breakdowns.push({ position: 'PRD1', assetType: 'product', assetId: teamLineup.prd1Id, ...result });
   }
 
   if (teamLineup.prd2Id) {
-    const result = await scoreProduct(teamLineup.prd2Id, year, week);
+    const result = await scoreProduct(teamLineup.prd2Id, scope);
     positionPoints.prd2 = result.points;
     breakdowns.push({ position: 'PRD2', assetType: 'product', assetId: teamLineup.prd2Id, ...result });
   }
 
-  // Score pharmacies
   if (teamLineup.phm1Id) {
-    const result = await scorePharmacy(teamLineup.phm1Id, year, week);
+    const result = await scorePharmacy(teamLineup.phm1Id, scope);
     positionPoints.phm1 = result.points;
     breakdowns.push({ position: 'PHM1', assetType: 'pharmacy', assetId: teamLineup.phm1Id, ...result });
   }
 
   if (teamLineup.phm2Id) {
-    const result = await scorePharmacy(teamLineup.phm2Id, year, week);
+    const result = await scorePharmacy(teamLineup.phm2Id, scope);
     positionPoints.phm2 = result.points;
     breakdowns.push({ position: 'PHM2', assetType: 'pharmacy', assetId: teamLineup.phm2Id, ...result });
   }
 
-  // Score brand
   if (teamLineup.brd1Id) {
-    const result = await scoreBrand(teamLineup.brd1Id, year, week);
+    const result = await scoreBrand(teamLineup.brd1Id, scope);
     positionPoints.brd1 = result.points;
     breakdowns.push({ position: 'BRD1', assetType: 'brand', assetId: teamLineup.brd1Id, ...result });
   }
 
-  // Score FLEX
   if (teamLineup.flexId && teamLineup.flexType) {
     let result;
     if (teamLineup.flexType === 'manufacturer') {
-      result = await scoreManufacturer(teamLineup.flexId, year, week);
+      result = await scoreManufacturer(teamLineup.flexId, scope);
     } else if (teamLineup.flexType === 'brand') {
-      result = await scoreBrand(teamLineup.flexId, year, week);
+      result = await scoreBrand(teamLineup.flexId, scope);
     } else if (teamLineup.flexType === 'cannabis_strain') {
-      result = await scoreCannabisStrain(teamLineup.flexId, year, week);
+      result = await scoreCannabisStrain(teamLineup.flexId, scope);
     } else if (teamLineup.flexType === 'product') {
-      result = await scoreProduct(teamLineup.flexId, year, week);
+      result = await scoreProduct(teamLineup.flexId, scope);
     } else {
-      result = await scorePharmacy(teamLineup.flexId, year, week);
+      result = await scorePharmacy(teamLineup.flexId, scope);
     }
     positionPoints.flex = result.points;
     breakdowns.push({ position: 'FLEX', assetType: teamLineup.flexType, assetId: teamLineup.flexId, ...result });
   }
 
-  // Calculate subtotal
   const subtotal = Object.values(positionPoints).reduce((sum, pts) => sum + pts, 0);
 
-  // Calculate team bonuses
-  const { bonuses, totalBonus } = calculateTeamBonuses(subtotal, positionPoints);
+  const { totalBonus } = calculateTeamBonuses(subtotal, positionPoints);
 
-  // Calculate final total
   const totalPoints = subtotal + totalBonus;
 
-  // Save to database (upsert: update if exists, insert if not)
-  const existingScore = await db.select().from(weeklyTeamScores).where(and(
-    eq(weeklyTeamScores.teamId, teamId),
-    eq(weeklyTeamScores.year, year),
-    eq(weeklyTeamScores.week, week)
-  )).limit(1);
+  await persistTeamScore(db, {
+    persistence: options.persistence,
+    positionPoints,
+    totalPoints,
+    totalBonus,
+    breakdowns,
+  });
 
-  let scoreId: number;
-
-  if (existingScore.length > 0) {
-    // Update existing score
-    await db.update(weeklyTeamScores)
-      .set({
-        mfg1Points: positionPoints.mfg1,
-        mfg2Points: positionPoints.mfg2,
-        cstr1Points: positionPoints.cstr1,
-        cstr2Points: positionPoints.cstr2,
-        prd1Points: positionPoints.prd1,
-        prd2Points: positionPoints.prd2,
-        phm1Points: positionPoints.phm1,
-        phm2Points: positionPoints.phm2,
-        brd1Points: positionPoints.brd1,
-        flexPoints: positionPoints.flex,
-        bonusPoints: totalBonus,
-        penaltyPoints: 0,
-        totalPoints,
-      })
-      .where(and(
-        eq(weeklyTeamScores.teamId, teamId),
-        eq(weeklyTeamScores.year, year),
-        eq(weeklyTeamScores.week, week)
-      ));
-    scoreId = existingScore[0].id;
-
-    // Delete old breakdowns
-    await db.delete(scoringBreakdowns)
-      .where(eq(scoringBreakdowns.weeklyTeamScoreId, scoreId));
-  } else {
-    // Insert new score
-    const inserted = await db.insert(weeklyTeamScores).values({
-      teamId,
-      year,
-      week,
-      mfg1Points: positionPoints.mfg1,
-      mfg2Points: positionPoints.mfg2,
-      cstr1Points: positionPoints.cstr1,
-      cstr2Points: positionPoints.cstr2,
-      prd1Points: positionPoints.prd1,
-      prd2Points: positionPoints.prd2,
-      phm1Points: positionPoints.phm1,
-      phm2Points: positionPoints.phm2,
-      brd1Points: positionPoints.brd1,
-      flexPoints: positionPoints.flex,
-      bonusPoints: totalBonus,
-      penaltyPoints: 0,
-      totalPoints,
-    }).returning({ id: weeklyTeamScores.id });
-    scoreId = inserted[0].id;
-  }
-
-  // Save scoring breakdowns
-  for (const breakdown of breakdowns) {
-    await db.insert(scoringBreakdowns).values({
-      weeklyTeamScoreId: scoreId,
-      assetType: breakdown.assetType as any,
-      assetId: breakdown.assetId,
-      position: breakdown.position,
-      breakdown: breakdown.breakdown,
-      totalPoints: breakdown.points,
-    });
-  }
-
-  console.log(`[Scoring] Team ${teamId} scored ${totalPoints} points for ${year}-W${week}`);
+  console.log(`[Scoring] Team ${options.teamId} scored ${totalPoints} points (${options.persistence.mode})`);
 
   return totalPoints;
+}
+
+interface PersistScoreParams {
+  persistence: TeamScorePersistence;
+  positionPoints: {
+    mfg1: number;
+    mfg2: number;
+    cstr1: number;
+    cstr2: number;
+    prd1: number;
+    prd2: number;
+    phm1: number;
+    phm2: number;
+    brd1: number;
+    flex: number;
+  };
+  totalPoints: number;
+  totalBonus: number;
+  breakdowns: Array<{
+    position: string;
+    assetType: string;
+    assetId: number;
+    points: number;
+    breakdown: any;
+  }>;
+}
+
+async function persistTeamScore(db: Awaited<ReturnType<typeof getDb>>, params: PersistScoreParams): Promise<void> {
+  if (!db) {
+    throw new Error('Database not available');
+  }
+
+  if (params.persistence.mode === 'weekly') {
+    const existingScore = await db.select().from(weeklyTeamScores).where(and(
+      eq(weeklyTeamScores.teamId, params.persistence.teamId),
+      eq(weeklyTeamScores.year, params.persistence.year),
+      eq(weeklyTeamScores.week, params.persistence.week)
+    )).limit(1);
+
+    let scoreId: number;
+
+    if (existingScore.length > 0) {
+      await db.update(weeklyTeamScores)
+        .set({
+          mfg1Points: params.positionPoints.mfg1,
+          mfg2Points: params.positionPoints.mfg2,
+          cstr1Points: params.positionPoints.cstr1,
+          cstr2Points: params.positionPoints.cstr2,
+          prd1Points: params.positionPoints.prd1,
+          prd2Points: params.positionPoints.prd2,
+          phm1Points: params.positionPoints.phm1,
+          phm2Points: params.positionPoints.phm2,
+          brd1Points: params.positionPoints.brd1,
+          flexPoints: params.positionPoints.flex,
+          bonusPoints: params.totalBonus,
+          penaltyPoints: 0,
+          totalPoints: params.totalPoints,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(and(
+          eq(weeklyTeamScores.teamId, params.persistence.teamId),
+          eq(weeklyTeamScores.year, params.persistence.year),
+          eq(weeklyTeamScores.week, params.persistence.week)
+        ));
+      scoreId = existingScore[0].id;
+
+      await db.delete(scoringBreakdowns)
+        .where(eq(scoringBreakdowns.weeklyTeamScoreId, scoreId));
+    } else {
+      const inserted = await db.insert(weeklyTeamScores).values({
+        teamId: params.persistence.teamId,
+        year: params.persistence.year,
+        week: params.persistence.week,
+        mfg1Points: params.positionPoints.mfg1,
+        mfg2Points: params.positionPoints.mfg2,
+        cstr1Points: params.positionPoints.cstr1,
+        cstr2Points: params.positionPoints.cstr2,
+        prd1Points: params.positionPoints.prd1,
+        prd2Points: params.positionPoints.prd2,
+        phm1Points: params.positionPoints.phm1,
+        phm2Points: params.positionPoints.phm2,
+        brd1Points: params.positionPoints.brd1,
+        flexPoints: params.positionPoints.flex,
+        bonusPoints: params.totalBonus,
+        penaltyPoints: 0,
+        totalPoints: params.totalPoints,
+      }).returning({ id: weeklyTeamScores.id });
+      scoreId = inserted[0].id;
+    }
+
+    for (const breakdown of params.breakdowns) {
+      await db.insert(scoringBreakdowns).values({
+        weeklyTeamScoreId: scoreId,
+        assetType: breakdown.assetType as any,
+        assetId: breakdown.assetId,
+        position: breakdown.position,
+        breakdown: breakdown.breakdown,
+        totalPoints: breakdown.points,
+      });
+    }
+  } else {
+    const existingScore = await db.select().from(dailyTeamScores).where(and(
+      eq(dailyTeamScores.teamId, params.persistence.teamId),
+      eq(dailyTeamScores.challengeId, params.persistence.challengeId),
+      eq(dailyTeamScores.statDate, params.persistence.statDate)
+    )).limit(1);
+
+    let scoreId: number;
+
+    if (existingScore.length > 0) {
+      await db.update(dailyTeamScores)
+        .set({
+          mfg1Points: params.positionPoints.mfg1,
+          mfg2Points: params.positionPoints.mfg2,
+          cstr1Points: params.positionPoints.cstr1,
+          cstr2Points: params.positionPoints.cstr2,
+          prd1Points: params.positionPoints.prd1,
+          prd2Points: params.positionPoints.prd2,
+          phm1Points: params.positionPoints.phm1,
+          phm2Points: params.positionPoints.phm2,
+          brd1Points: params.positionPoints.brd1,
+          flexPoints: params.positionPoints.flex,
+          bonusPoints: params.totalBonus,
+          penaltyPoints: 0,
+          totalPoints: params.totalPoints,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(and(
+          eq(dailyTeamScores.teamId, params.persistence.teamId),
+          eq(dailyTeamScores.challengeId, params.persistence.challengeId),
+          eq(dailyTeamScores.statDate, params.persistence.statDate)
+        ));
+      scoreId = existingScore[0].id;
+
+      await db.delete(dailyScoringBreakdowns)
+        .where(eq(dailyScoringBreakdowns.dailyTeamScoreId, scoreId));
+    } else {
+      const inserted = await db.insert(dailyTeamScores).values({
+        teamId: params.persistence.teamId,
+        challengeId: params.persistence.challengeId,
+        statDate: params.persistence.statDate,
+        mfg1Points: params.positionPoints.mfg1,
+        mfg2Points: params.positionPoints.mfg2,
+        cstr1Points: params.positionPoints.cstr1,
+        cstr2Points: params.positionPoints.cstr2,
+        prd1Points: params.positionPoints.prd1,
+        prd2Points: params.positionPoints.prd2,
+        phm1Points: params.positionPoints.phm1,
+        phm2Points: params.positionPoints.phm2,
+        brd1Points: params.positionPoints.brd1,
+        flexPoints: params.positionPoints.flex,
+        bonusPoints: params.totalBonus,
+        penaltyPoints: 0,
+        totalPoints: params.totalPoints,
+      }).returning({ id: dailyTeamScores.id });
+      scoreId = inserted[0].id;
+    }
+
+    for (const breakdown of params.breakdowns) {
+      await db.insert(dailyScoringBreakdowns).values({
+        dailyTeamScoreId: scoreId,
+        assetType: breakdown.assetType as any,
+        assetId: breakdown.assetId,
+        position: breakdown.position,
+        breakdown: breakdown.breakdown,
+        totalPoints: breakdown.points,
+      });
+    }
+  }
 }
 
 /**
  * Score a manufacturer for a specific week
  */
-async function scoreManufacturer(manufacturerId: number, year: number, week: number): Promise<{ points: number; breakdown: any }> {
+async function scoreManufacturer(manufacturerId: number, scope: ScoreScope): Promise<{ points: number; breakdown: any }> {
   const db = await getDb();
   if (!db) {
     throw new Error('Database not available');
   }
 
-  // Get weekly stats
-  const stats = await db
-    .select()
-    .from(manufacturerWeeklyStats)
-    .where(and(
-      eq(manufacturerWeeklyStats.manufacturerId, manufacturerId),
-      eq(manufacturerWeeklyStats.year, year),
-      eq(manufacturerWeeklyStats.week, week)
-    ))
-    .limit(1);
+  let stats;
+  if (scope.type === 'weekly') {
+    stats = await db
+      .select()
+      .from(manufacturerWeeklyStats)
+      .where(and(
+        eq(manufacturerWeeklyStats.manufacturerId, manufacturerId),
+        eq(manufacturerWeeklyStats.year, scope.year),
+        eq(manufacturerWeeklyStats.week, scope.week)
+      ))
+      .limit(1);
+  } else {
+    stats = await db
+      .select()
+      .from(manufacturerDailyStats)
+      .where(and(
+        eq(manufacturerDailyStats.manufacturerId, manufacturerId),
+        eq(manufacturerDailyStats.statDate, scope.statDate)
+      ))
+      .limit(1);
+  }
 
   if (stats.length === 0) {
-    console.log(`[Scoring] No stats found for manufacturer ${manufacturerId}, ${year}-W${week}`);
+    console.log(`[Scoring] No stats found for manufacturer ${manufacturerId}, scope=${scope.type === 'weekly' ? `${scope.year}-W${scope.week}` : scope.statDate}`);
     return { points: 0, breakdown: {} };
   }
 
-  const weekStats = stats[0];
+  const statRecord = stats[0];
 
   return calculateManufacturerPoints({
-    salesVolumeGrams: weekStats.salesVolumeGrams,
-    growthRatePercent: weekStats.growthRatePercent,
-    marketShareRank: weekStats.marketShareRank,
-    rankChange: weekStats.rankChange,
-    productCount: weekStats.productCount,
+    salesVolumeGrams: statRecord.salesVolumeGrams,
+    growthRatePercent: statRecord.growthRatePercent,
+    marketShareRank: statRecord.marketShareRank,
+    rankChange: statRecord.rankChange,
+    productCount: statRecord.productCount,
   });
 }
 
@@ -821,35 +1057,47 @@ async function scoreManufacturer(manufacturerId: number, year: number, week: num
  * Score a cannabis strain (genetics/cultivar) for a specific week
  * Cannabis strains score based on aggregate metrics across all products using that strain
  */
-async function scoreCannabisStrain(cannabisStrainId: number, year: number, week: number): Promise<{ points: number; breakdown: any }> {
+async function scoreCannabisStrain(cannabisStrainId: number, scope: ScoreScope): Promise<{ points: number; breakdown: any }> {
   const db = await getDb();  
   if (!db) {
     throw new Error('Database not available');
   }
 
-  // Check if we have weekly stats for this cannabis strain
-  const weeklyStats = await db
-    .select()
-    .from(cannabisStrainWeeklyStats)
-    .where(
-      and(
-        eq(cannabisStrainWeeklyStats.cannabisStrainId, cannabisStrainId),
-        eq(cannabisStrainWeeklyStats.year, year),
-        eq(cannabisStrainWeeklyStats.week, week)
+  let stats;
+  if (scope.type === 'weekly') {
+    stats = await db
+      .select()
+      .from(cannabisStrainWeeklyStats)
+      .where(
+        and(
+          eq(cannabisStrainWeeklyStats.cannabisStrainId, cannabisStrainId),
+          eq(cannabisStrainWeeklyStats.year, scope.year),
+          eq(cannabisStrainWeeklyStats.week, scope.week)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
+  } else {
+    stats = await db
+      .select()
+      .from(cannabisStrainDailyStats)
+      .where(
+        and(
+          eq(cannabisStrainDailyStats.cannabisStrainId, cannabisStrainId),
+          eq(cannabisStrainDailyStats.statDate, scope.statDate)
+        )
+      )
+      .limit(1);
+  }
 
-  if (weeklyStats.length === 0) {
-    console.log(`[Scoring] No weekly stats found for cannabis strain ${cannabisStrainId}, ${year}-W${week}`);
-    // Return zero points if no stats available
+  if (stats.length === 0) {
+    console.log(`[Scoring] No stats found for cannabis strain ${cannabisStrainId}, scope=${scope.type === 'weekly' ? `${scope.year}-W${scope.week}` : scope.statDate}`);
     return {
       points: 0,
       breakdown: {
         components: [{
           category: 'No Data',
           value: 0,
-          formula: 'No weekly stats available',
+          formula: 'No stats available',
           points: 0,
         }],
         subtotal: 0,
@@ -860,22 +1108,27 @@ async function scoreCannabisStrain(cannabisStrainId: number, year: number, week:
     };
   }
 
-  const stats = weeklyStats[0];
+  const statRecord = stats[0];
   
-  // Calculate points using the cannabis strain scoring formula
   const result = calculateCannabisStrainPoints({
-    totalFavorites: stats.totalFavorites,
-    pharmacyCount: stats.pharmacyCount,
-    productCount: stats.productCount,
-    avgPriceChange: stats.priceChange,
-    marketPenetration: stats.marketPenetration,
+    totalFavorites: statRecord.totalFavorites,
+    pharmacyCount: statRecord.pharmacyCount,
+    productCount: statRecord.productCount,
+    avgPriceChange: statRecord.priceChange,
+    marketPenetration: statRecord.marketPenetration,
   });
 
-  // Update the total points in the database
-  await db
-    .update(cannabisStrainWeeklyStats)
-    .set({ totalPoints: result.points })
-    .where(eq(cannabisStrainWeeklyStats.id, stats.id));
+  if (scope.type === 'weekly') {
+    await db
+      .update(cannabisStrainWeeklyStats)
+      .set({ totalPoints: result.points })
+      .where(eq(cannabisStrainWeeklyStats.id, statRecord.id));
+  } else {
+    await db
+      .update(cannabisStrainDailyStats)
+      .set({ totalPoints: result.points, updatedAt: new Date().toISOString() })
+      .where(eq(cannabisStrainDailyStats.id, statRecord.id));
+  }
 
   return result;
 }
@@ -883,116 +1136,140 @@ async function scoreCannabisStrain(cannabisStrainId: number, year: number, week:
 /**
  * Score a product (pharmaceutical product) for a specific week
  */
-async function scoreProduct(productId: number, year: number, week: number): Promise<{ points: number; breakdown: any }> {
+async function scoreProduct(productId: number, scope: ScoreScope): Promise<{ points: number; breakdown: any }> {
   const db = await getDb();
   if (!db) {
     throw new Error('Database not available');
   }
 
-  // Get weekly stats
-  const stats = await db
-    .select()
-    .from(strainWeeklyStats)
-    .where(and(
-      eq(strainWeeklyStats.strainId, productId),
-      eq(strainWeeklyStats.year, year),
-      eq(strainWeeklyStats.week, week)
-    ))
-    .limit(1);
+  const stats = scope.type === 'weekly'
+    ? await db
+        .select()
+        .from(strainWeeklyStats)
+        .where(and(
+          eq(strainWeeklyStats.strainId, productId),
+          eq(strainWeeklyStats.year, scope.year),
+          eq(strainWeeklyStats.week, scope.week)
+        ))
+        .limit(1)
+    : await db
+        .select()
+        .from(strainDailyStats)
+        .where(and(
+          eq(strainDailyStats.strainId, productId),
+          eq(strainDailyStats.statDate, scope.statDate)
+        ))
+        .limit(1);
 
   if (stats.length === 0) {
-    console.log(`[Scoring] No stats found for product ${productId}, ${year}-W${week}`);
+    console.log(`[Scoring] No stats found for product ${productId}, scope=${scope.type === 'weekly' ? `${scope.year}-W${scope.week}` : scope.statDate}`);
     return { points: 0, breakdown: {} };
   }
 
-  const weekStats = stats[0];
+  const statRecord = stats[0];
 
   return calculateStrainPoints({
-    favoriteCount: weekStats.favoriteCount,
-    favoriteGrowth: weekStats.favoriteGrowth,
-    pharmacyCount: weekStats.pharmacyCount,
-    pharmacyExpansion: weekStats.pharmacyExpansion,
-    avgPriceCents: weekStats.avgPriceCents,
-    priceStability: weekStats.priceStability,
-    orderVolumeGrams: weekStats.orderVolumeGrams,
+    favoriteCount: statRecord.favoriteCount,
+    favoriteGrowth: statRecord.favoriteGrowth,
+    pharmacyCount: statRecord.pharmacyCount,
+    pharmacyExpansion: statRecord.pharmacyExpansion,
+    avgPriceCents: statRecord.avgPriceCents,
+    priceStability: statRecord.priceStability,
+    orderVolumeGrams: statRecord.orderVolumeGrams,
   });
 }
 
 /**
  * Score a pharmacy for a specific week
  */
-async function scorePharmacy(pharmacyId: number, year: number, week: number): Promise<{ points: number; breakdown: any }> {
+async function scorePharmacy(pharmacyId: number, scope: ScoreScope): Promise<{ points: number; breakdown: any }> {
   const db = await getDb();
   if (!db) {
     throw new Error('Database not available');
   }
 
-  // Get weekly stats
-  const stats = await db
-    .select()
-    .from(pharmacyWeeklyStats)
-    .where(and(
-      eq(pharmacyWeeklyStats.pharmacyId, pharmacyId),
-      eq(pharmacyWeeklyStats.year, year),
-      eq(pharmacyWeeklyStats.week, week)
-    ))
-    .limit(1);
+  const stats = scope.type === 'weekly'
+    ? await db
+        .select()
+        .from(pharmacyWeeklyStats)
+        .where(and(
+          eq(pharmacyWeeklyStats.pharmacyId, pharmacyId),
+          eq(pharmacyWeeklyStats.year, scope.year),
+          eq(pharmacyWeeklyStats.week, scope.week)
+        ))
+        .limit(1)
+    : await db
+        .select()
+        .from(pharmacyDailyStats)
+        .where(and(
+          eq(pharmacyDailyStats.pharmacyId, pharmacyId),
+          eq(pharmacyDailyStats.statDate, scope.statDate)
+        ))
+        .limit(1);
 
   if (stats.length === 0) {
-    console.log(`[Scoring] No stats found for pharmacy ${pharmacyId}, ${year}-W${week}`);
+    console.log(`[Scoring] No stats found for pharmacy ${pharmacyId}, scope=${scope.type === 'weekly' ? `${scope.year}-W${scope.week}` : scope.statDate}`);
     return { points: 0, breakdown: {} };
   }
 
-  const weekStats = stats[0];
+  const statRecord = stats[0];
 
   return calculatePharmacyPoints({
-    revenueCents: weekStats.revenueCents,
-    orderCount: weekStats.orderCount,
-    avgOrderSizeGrams: weekStats.avgOrderSizeGrams,
-    customerRetentionRate: weekStats.customerRetentionRate,
-    productVariety: weekStats.productVariety,
-    appUsageRate: weekStats.appUsageRate,
-    growthRatePercent: weekStats.growthRatePercent,
+    revenueCents: statRecord.revenueCents,
+    orderCount: statRecord.orderCount,
+    avgOrderSizeGrams: statRecord.avgOrderSizeGrams,
+    customerRetentionRate: statRecord.customerRetentionRate,
+    productVariety: statRecord.productVariety,
+    appUsageRate: statRecord.appUsageRate,
+    growthRatePercent: statRecord.growthRatePercent,
   });
 }
 
 /**
  * Score a brand for a specific week
  */
-async function scoreBrand(brandId: number, year: number, week: number): Promise<{ points: number; breakdown: any }> {
+async function scoreBrand(brandId: number, scope: ScoreScope): Promise<{ points: number; breakdown: any }> {
   const db = await getDb();
   if (!db) {
     throw new Error('Database not available');
   }
 
-  // Get weekly stats
-  const stats = await db
-    .select()
-    .from(brandWeeklyStats)
-    .where(and(
-      eq(brandWeeklyStats.brandId, brandId),
-      eq(brandWeeklyStats.year, year),
-      eq(brandWeeklyStats.week, week)
-    ))
-    .limit(1);
+  const stats = scope.type === 'weekly'
+    ? await db
+        .select()
+        .from(brandWeeklyStats)
+        .where(and(
+          eq(brandWeeklyStats.brandId, brandId),
+          eq(brandWeeklyStats.year, scope.year),
+          eq(brandWeeklyStats.week, scope.week)
+        ))
+        .limit(1)
+    : await db
+        .select()
+        .from(brandDailyStats)
+        .where(and(
+          eq(brandDailyStats.brandId, brandId),
+          eq(brandDailyStats.statDate, scope.statDate)
+        ))
+        .limit(1);
 
   if (stats.length === 0) {
-    console.log(`[Scoring] No stats found for brand ${brandId}, ${year}-W${week}`);
+    console.log(`[Scoring] No stats found for brand ${brandId}, scope=${scope.type === 'weekly' ? `${scope.year}-W${scope.week}` : scope.statDate}`);
     return { points: 0, breakdown: {} };
   }
 
-  const weekStats = stats[0];
+  const statRecord = stats[0];
 
   return calculateBrandPoints({
-    favorites: weekStats.favorites,
-    favoriteGrowth: weekStats.favoriteGrowth,
-    views: weekStats.views,
-    viewGrowth: weekStats.viewGrowth,
-    comments: weekStats.comments,
-    commentGrowth: weekStats.commentGrowth,
-    affiliateClicks: weekStats.affiliateClicks,
-    clickGrowth: weekStats.clickGrowth,
-    engagementRate: weekStats.engagementRate,
-    sentimentScore: weekStats.sentimentScore,
+    favorites: statRecord.favorites,
+    favoriteGrowth: statRecord.favoriteGrowth,
+    views: statRecord.views,
+    viewGrowth: statRecord.viewGrowth,
+    comments: statRecord.comments,
+    commentGrowth: statRecord.commentGrowth,
+    affiliateClicks: statRecord.affiliateClicks,
+    clickGrowth: statRecord.clickGrowth,
+    engagementRate: statRecord.engagementRate,
+    sentimentScore: statRecord.sentimentScore,
   });
 }

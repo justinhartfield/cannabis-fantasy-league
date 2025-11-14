@@ -9,6 +9,9 @@ import { formatDistanceToNow } from 'date-fns';
 
 export default function AdminDashboard() {
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  const [dailySyncDate, setDailySyncDate] = useState('');
+  const [challengeRescoreId, setChallengeRescoreId] = useState('');
+  const [challengeRescoreDate, setChallengeRescoreDate] = useState('');
 
   // Queries
   const { data: stats, refetch: refetchStats } = trpc.admin.getDashboardStats.useQuery();
@@ -47,6 +50,24 @@ export default function AdminDashboard() {
   });
 
   const syncAll = trpc.admin.syncAll.useMutation({
+    onSuccess: () => {
+      setTimeout(() => {
+        refetchJobs();
+        refetchStats();
+      }, 1000);
+    },
+  });
+
+  const syncDailyStats = trpc.admin.syncDailyStats.useMutation({
+    onSuccess: () => {
+      setTimeout(() => {
+        refetchJobs();
+        refetchStats();
+      }, 1000);
+    },
+  });
+
+  const rescoreChallengeDay = trpc.scoring.calculateChallengeDay.useMutation({
     onSuccess: () => {
       setTimeout(() => {
         refetchJobs();
@@ -109,6 +130,62 @@ export default function AdminDashboard() {
           </p>
         </div>
       </div>
+
+    {/* Daily Challenge Operations */}
+    <div className="bg-white rounded-lg shadow p-6 mb-8">
+      <h2 className="text-xl font-semibold mb-4">Daily Challenge Ops</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Daily Stats Date</label>
+          <input
+            type="date"
+            value={dailySyncDate}
+            onChange={(e) => setDailySyncDate(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+          />
+          <button
+            onClick={() => syncDailyStats.mutate(dailySyncDate ? { date: dailySyncDate } : {})}
+            disabled={syncDailyStats.isLoading}
+            className="w-full px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncDailyStats.isLoading ? 'Syncing...' : 'Sync Daily Stats'}
+          </button>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Re-score Challenge Day</label>
+          <input
+            type="number"
+            placeholder="Challenge ID"
+            value={challengeRescoreId}
+            onChange={(e) => setChallengeRescoreId(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+          />
+          <input
+            type="date"
+            value={challengeRescoreDate}
+            onChange={(e) => setChallengeRescoreDate(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+          />
+          <button
+            onClick={() =>
+              rescoreChallengeDay.mutate({
+                challengeId: Number(challengeRescoreId),
+                statDate: challengeRescoreDate || new Date().toISOString().split('T')[0],
+              })
+            }
+            disabled={
+              rescoreChallengeDay.isLoading ||
+              !challengeRescoreId ||
+              Number.isNaN(Number(challengeRescoreId)) ||
+              !challengeRescoreDate
+            }
+            className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {rescoreChallengeDay.isLoading ? 'Re-scoring...' : 'Re-score Challenge'}
+          </button>
+        </div>
+      </div>
+    </div>
 
       {/* Sync Controls */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
