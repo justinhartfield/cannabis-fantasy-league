@@ -74,6 +74,8 @@ export class DailyChallengeAggregator {
 
     // Filter by date
     const targetDate = new Date(dateString);
+    console.log(`[DailyChallengeAggregator] Target date: ${targetDate.toISOString()}, year=${targetDate.getFullYear()}, month=${targetDate.getMonth()}, day=${targetDate.getDate()}`);
+    console.log(`[DailyChallengeAggregator] First 3 order dates:`, allOrders.slice(0, 3).map((o: any) => o.OrderDate));
     const filtered = allOrders.filter((order: any) => {
       if (!order.OrderDate) return false;
       const orderDate = new Date(order.OrderDate);
