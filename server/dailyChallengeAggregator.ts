@@ -69,8 +69,8 @@ export class DailyChallengeAggregator {
   private async fetchOrdersForDate(dateString: string): Promise<OrderRecord[]> {
     console.log(`[DailyChallengeAggregator] Fetching orders from Metabase...`);
 
-    // Query Metabase question 1264 (Orders by Day Full Detail)
-    const allOrders = await this.metabase.executeCardQuery(1264);
+    // Query Metabase question 1266 (TODAY Completed transactions with recent data)
+    const allOrders = await this.metabase.executeCardQuery(1266);
 
     // Filter by date
     const targetDate = new Date(dateString);
