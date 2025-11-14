@@ -5,7 +5,6 @@ import { trpc } from "@/lib/trpc";
 import { Trophy, Plus, UserCircle, TrendingUp, Calendar, Zap, Loader2, Activity } from "lucide-react";
 import { Link } from "wouter";
 import { APP_TITLE, getLoginUrl } from "@/const";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { StatBadge } from "@/components/StatBadge";
 import { LiveScoreCard } from "@/components/LiveScoreCard";
 
@@ -53,7 +52,6 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-4">
-              <ThemeToggle />
               <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-card/50 border border-border/50">
                 <UserCircle className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">
