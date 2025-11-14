@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { leagues, teams, users, invitations } from "../drizzle/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { sendLeagueInvitation, sendWelcomeEmail } from "./emailService";
@@ -89,15 +89,15 @@ export const invitationRouter = router({
       }
 
       // Check if email is already invited or a member
-      const existingInvitationResult = await db.execute(sql`
-        SELECT id FROM "invitations"
-        WHERE "leagueId" = ${input.leagueId}
-        AND "email" = ${input.email}
-        AND "status" = 'pending'
-        LIMIT 1
-      `);
+      const existingInvitation = await db.query.invitations.findFirst({
+        where: and(
+          eq(invitations.leagueId, input.leagueId),
+          eq(invitations.email, input.email),
+          eq(invitations.status, 'pending')
+        )
+      });
 
-      if (existingInvitationResult.rows.length > 0) {
+      if (existingInvitation) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'User already has a pending invitation' });
       }
 
