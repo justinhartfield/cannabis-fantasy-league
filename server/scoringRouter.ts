@@ -334,11 +334,12 @@ export const scoringRouter = router({
           .limit(1);
 
         if (scores.length > 0) {
+          const { teamId: _, ...scoreData } = scores[0];
           teamScores.push({
             teamId: team.id,
             teamName: team.name,
             points: scores[0].totalPoints,
-            ...scores[0],
+            ...scoreData,
           });
         } else {
           teamScores.push({
@@ -370,15 +371,27 @@ export const scoringRouter = router({
       }
 
       try {
+        console.log(`[Scoring API] getChallengeDayScores - userId: ${ctx.user.id}, challengeId: ${input.challengeId}, statDate: ${input.statDate}`);
+        
         // Verify user has access to this challenge (owns a team or is admin)
-        const userTeams = await db
-          .select()
-          .from(teams)
-          .where(and(
-            eq(teams.leagueId, input.challengeId),
-            eq(teams.userId, ctx.user.id)
-          ))
-          .limit(1);
+        let userTeams;
+        try {
+          userTeams = await db
+            .select()
+            .from(teams)
+            .where(and(
+              eq(teams.leagueId, input.challengeId),
+              eq(teams.userId, ctx.user.id)
+            ))
+            .limit(1);
+        } catch (error) {
+          console.error('[Scoring API] Error checking user access:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to verify access',
+            cause: error,
+          });
+        }
 
         if (userTeams.length === 0 && ctx.user.role !== 'admin') {
           throw new TRPCError({
@@ -406,11 +419,12 @@ export const scoringRouter = router({
               .limit(1);
 
             if (scores.length > 0) {
+              const { teamId: _, ...scoreData } = scores[0];
               teamScores.push({
                 teamId: team.id,
                 teamName: team.name,
                 points: scores[0].totalPoints,
-                ...scores[0],
+                ...scoreData,
               });
             } else {
               teamScores.push({
@@ -419,8 +433,16 @@ export const scoringRouter = router({
                 points: 0,
               });
             }
-          } catch (error) {
-            console.error(`[Scoring API] Error fetching score for team ${team.id}:`, error);
+          } catch (error: any) {
+            console.error(`[Scoring API] Error fetching score for team ${team.id}:`, {
+              error: error?.message || String(error),
+              stack: error?.stack,
+              name: error?.name,
+              code: error?.code,
+              challengeId: input.challengeId,
+              teamId: team.id,
+              statDate: input.statDate,
+            });
             // Continue with other teams even if one fails
             teamScores.push({
               teamId: team.id,
@@ -431,14 +453,22 @@ export const scoringRouter = router({
         }
 
         return teamScores;
-      } catch (error) {
+      } catch (error: any) {
         if (error instanceof TRPCError) {
           throw error;
         }
-        console.error('[Scoring API] Error in getChallengeDayScores:', error);
+        console.error('[Scoring API] Error in getChallengeDayScores:', {
+          error: error?.message || String(error),
+          stack: error?.stack,
+          name: error?.name,
+          code: error?.code,
+          userId: ctx.user.id,
+          challengeId: input.challengeId,
+          statDate: input.statDate,
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch challenge day scores',
+          message: error?.message || 'Failed to fetch challenge day scores',
           cause: error,
         });
       }
@@ -463,15 +493,27 @@ export const scoringRouter = router({
       }
 
       try {
+        console.log(`[Scoring API] getChallengeDayBreakdown - userId: ${ctx.user.id}, challengeId: ${input.challengeId}, teamId: ${input.teamId}, statDate: ${input.statDate}`);
+        
         // Verify user has access to this challenge (owns a team or is admin)
-        const userTeams = await db
-          .select()
-          .from(teams)
-          .where(and(
-            eq(teams.leagueId, input.challengeId),
-            eq(teams.userId, ctx.user.id)
-          ))
-          .limit(1);
+        let userTeams;
+        try {
+          userTeams = await db
+            .select()
+            .from(teams)
+            .where(and(
+              eq(teams.leagueId, input.challengeId),
+              eq(teams.userId, ctx.user.id)
+            ))
+            .limit(1);
+        } catch (error) {
+          console.error('[Scoring API] Error checking user access:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to verify access',
+            cause: error,
+          });
+        }
 
         if (userTeams.length === 0 && ctx.user.role !== 'admin') {
           throw new TRPCError({
@@ -497,15 +539,33 @@ export const scoringRouter = router({
           });
         }
 
-        const scores = await db
-          .select()
-          .from(dailyTeamScores)
-          .where(and(
-            eq(dailyTeamScores.teamId, input.teamId),
-            eq(dailyTeamScores.challengeId, input.challengeId),
-            eq(dailyTeamScores.statDate, input.statDate)
-          ))
-          .limit(1);
+        let scores;
+        try {
+          scores = await db
+            .select()
+            .from(dailyTeamScores)
+            .where(and(
+              eq(dailyTeamScores.teamId, input.teamId),
+              eq(dailyTeamScores.challengeId, input.challengeId),
+              eq(dailyTeamScores.statDate, input.statDate)
+            ))
+            .limit(1);
+        } catch (error: any) {
+          console.error('[Scoring API] Error fetching daily team scores:', {
+            error: error?.message || String(error),
+            stack: error?.stack,
+            name: error?.name,
+            code: error?.code,
+            challengeId: input.challengeId,
+            teamId: input.teamId,
+            statDate: input.statDate,
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Database query failed: ${error?.message || 'Unknown error'}`,
+            cause: error,
+          });
+        }
 
         if (scores.length === 0) {
           return null;
@@ -582,14 +642,23 @@ export const scoringRouter = router({
           score,
           breakdowns: enrichedBreakdowns,
         };
-      } catch (error) {
+      } catch (error: any) {
         if (error instanceof TRPCError) {
           throw error;
         }
-        console.error('[Scoring API] Error in getChallengeDayBreakdown:', error);
+        console.error('[Scoring API] Error in getChallengeDayBreakdown:', {
+          error: error?.message || String(error),
+          stack: error?.stack,
+          name: error?.name,
+          code: error?.code,
+          userId: ctx.user.id,
+          challengeId: input.challengeId,
+          teamId: input.teamId,
+          statDate: input.statDate,
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch challenge day breakdown',
+          message: error?.message || 'Failed to fetch challenge day breakdown',
           cause: error,
         });
       }
