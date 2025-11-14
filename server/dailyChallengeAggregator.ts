@@ -115,6 +115,8 @@ export class DailyChallengeAggregator {
 
     // Sort by sales volume to determine ranks
     const sorted = Array.from(stats.entries()).sort((a, b) => b[1].salesVolumeGrams - a[1].salesVolumeGrams);
+    console.log(`[DailyChallengeAggregator] Found ${stats.size} unique manufacturers in orders`);
+    console.log(`[DailyChallengeAggregator] Top 3 manufacturers:`, Array.from(stats.entries()).slice(0, 3).map(([name, data]) => ({ name, ...data })));
 
     // Save to database with calculated scores
     for (let i = 0; i < sorted.length; i++) {
