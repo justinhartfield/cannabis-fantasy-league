@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { APP_TITLE, getLoginUrl } from "@/const";
 import { StatBadge } from "@/components/StatBadge";
 import { LiveScoreCard } from "@/components/LiveScoreCard";
+import { LeagueCard } from "@/components/LeagueCard";
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -213,91 +214,9 @@ export default function Dashboard() {
             </Card>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myLeagues?.map((league) => {
-                const leaguePath = league.leagueType === 'challenge' 
-                  ? `/challenge/${league.id}` 
-                  : `/league/${league.id}`;
-                return (
-                <Link key={league.id} href={leaguePath}>
-                  <Card className="gradient-card border-border/50 card-hover-lift cursor-pointer h-full">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <CardTitle className="text-foreground text-xl mb-2">
-                            {league.name}
-                          </CardTitle>
-                          <CardDescription className="text-muted-foreground">
-                            {league.myTeam?.teamName}
-                          </CardDescription>
-                        </div>
-                        {league.commissionerId === user?.id && (
-                          <span className="px-2 py-1 rounded-lg text-xs gradient-primary text-white font-bold uppercase">
-                            Comm
-                          </span>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {/* My Team Stats - Prominent */}
-                      {league.myTeam && (
-                        <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/50">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs text-muted-foreground uppercase tracking-wide">Your Rank</span>
-                            <div className="flex items-center gap-1">
-                              <div className={`text-2xl font-bold ${
-                                (league.myTeam.rank || 999) <= 3 ? 'text-gradient-primary' : 'text-foreground'
-                              }`}>
-                                #{league.myTeam.rank || "-"}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">Total Points</span>
-                            <span className="text-lg font-bold text-[#00D9FF]">
-                              {league.myTeam.totalPoints?.toFixed(1) || "0.0"}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* League Info */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Status</span>
-                          <span className="font-semibold text-foreground capitalize">
-                            {league.seasonStatus === "pre_draft"
-                              ? "Pre-Draft"
-                              : league.seasonStatus === "drafting"
-                              ? "Drafting"
-                              : league.seasonStatus === "in_progress"
-                              ? "Active"
-                              : league.seasonStatus === "playoffs"
-                              ? "Playoffs"
-                              : "Complete"}
-                          </span>
-                        </div>
-
-                        {(league.seasonStatus === "in_progress" || league.seasonStatus === "playoffs") && (
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Week</span>
-                            <span className="font-semibold text-foreground">
-                              {league.currentWeek} / 18
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Teams</span>
-                          <span className="font-semibold text-foreground">
-                            {league.maxTeams}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-                );
-              })}
+              {myLeagues?.filter(league => league.leagueType !== 'challenge').map((league) => (
+                <LeagueCard key={league.id} league={league} />
+              ))}
             </div>
           )}
         </div>
@@ -314,25 +233,7 @@ export default function Dashboard() {
           {myLeagues && myLeagues.filter(l => l.leagueType === 'challenge').length > 0 ? (
             <div className="grid gap-4">
               {myLeagues.filter(l => l.leagueType === 'challenge').map((league) => (
-                <Link key={league.id} href={`/challenge/${league.id}`}>
-                  <Card className="gradient-card border-border/50 card-hover-lift cursor-pointer">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg text-foreground mb-1">
-                            {league.name}
-                          </CardTitle>
-                          <CardDescription>
-                            {league.teamCount} Teams • {league.status === 'active' ? 'Active' : 'Draft'}
-                          </CardDescription>
-                        </div>
-                        <div className="w-12 h-12 rounded-xl gradient-secondary flex items-center justify-center">
-                          <Zap className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
+                <LeagueCard key={league.id} league={league} />
               ))}
             </div>
           ) : (
