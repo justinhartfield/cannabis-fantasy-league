@@ -245,11 +245,11 @@ export const dataSyncRouter = router({
         throw new Error('Unauthorized: Admin access required');
       }
 
-      const { dailyStatsAggregator } = await import('./dailyStatsAggregator-v2');
+      const { dailyChallengeAggregator } = await import('./dailyChallengeAggregator');
       
       try {
         const statDate = input.statDate || new Date().toISOString().split('T')[0];
-        await dailyStatsAggregator.aggregateForDate(statDate);
+        await dailyChallengeAggregator.aggregateForDate(statDate);
         return {
           success: true,
           message: `Daily stats aggregated successfully for ${statDate}`,

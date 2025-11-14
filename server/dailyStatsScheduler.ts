@@ -6,7 +6,7 @@
  */
 
 import cron from 'node-cron';
-import { dailyStatsAggregator } from './dailyStatsAggregator-v2';
+import { dailyChallengeAggregator } from './dailyChallengeAggregator';
 
 export class DailyStatsScheduler {
   private cronJob: cron.ScheduledTask | null = null;
@@ -47,7 +47,7 @@ export class DailyStatsScheduler {
 
       console.log(`[DailyStatsScheduler] Starting aggregation for ${statDate}...`);
 
-      await dailyStatsAggregator.aggregateForDate(statDate);
+      await dailyChallengeAggregator.aggregateForDate(statDate);
 
       console.log(`[DailyStatsScheduler] ✅ Aggregation complete for ${statDate}`);
     } catch (error) {
@@ -62,7 +62,7 @@ export class DailyStatsScheduler {
     console.log(`[DailyStatsScheduler] Manual aggregation triggered for ${statDate}`);
     
     try {
-      await dailyStatsAggregator.aggregateForDate(statDate);
+      await dailyChallengeAggregator.aggregateForDate(statDate);
       console.log(`[DailyStatsScheduler] ✅ Manual aggregation complete for ${statDate}`);
     } catch (error) {
       console.error(`[DailyStatsScheduler] ❌ Manual aggregation failed for ${statDate}:`, error);
