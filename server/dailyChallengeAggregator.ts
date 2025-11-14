@@ -4,7 +4,7 @@
  * and calculates scores using the daily challenge scoring engine
  */
 
-import { db } from './_core/db';
+import { getDb } from './db';
 import { getMetabaseClient } from './metabase';
 import {
   calculateManufacturerScore,
@@ -33,10 +33,12 @@ export class DailyChallengeAggregator {
   /**
    * Aggregate daily challenge stats for a specific date
    */
-  async aggregateForDate(dateString: string): Promise<void> {
-    console.log(`[DailyChallengeAggregator] Aggregating stats for ${dateString}...`);
-
+  async aggregateForDate(dateString: string) {
     try {
+      console.log(`[DailyChallengeAggregator] Starting aggregation for ${dateString}...`);
+
+      const db = getDb();
+
       // Fetch orders from Metabase
       const orders = await this.fetchOrdersForDate(dateString);
       console.log(`[DailyChallengeAggregator] Found ${orders.length} orders for ${dateString}`);
@@ -48,10 +50,10 @@ export class DailyChallengeAggregator {
 
       // Aggregate and calculate scores for each entity type
       await Promise.all([
-        this.aggregateManufacturers(dateString, orders),
-        this.aggregateStrains(dateString, orders),
-        this.aggregatePharmacies(dateString, orders),
-        this.aggregateBrands(dateString, orders),
+        this.aggregateManufacturers(db, dateString, orders),
+        this.aggregateStrains(db, dateString, orders),
+        this.aggregatePharmacies(db, dateString, orders),
+        this.aggregateBrands(db, dateString, orders),
       ]);
 
       console.log(`[DailyChallengeAggregator] ✅ Aggregation complete for ${dateString}`);
@@ -89,7 +91,7 @@ export class DailyChallengeAggregator {
   /**
    * Aggregate manufacturer stats and calculate scores
    */
-  private async aggregateManufacturers(dateString: string, orders: OrderRecord[]): Promise<void> {
+  private async aggregateManufacturers(db: ReturnType<typeof getDb>, dateString: string, orders: OrderRecord[]): Promise<void> {
     console.log(`[DailyChallengeAggregator] Aggregating manufacturers...`);
 
     // Group by manufacturer
@@ -168,7 +170,7 @@ export class DailyChallengeAggregator {
   /**
    * Aggregate strain stats and calculate scores
    */
-  private async aggregateStrains(dateString: string, orders: OrderRecord[]): Promise<void> {
+  private async aggregateStrains(db: ReturnType<typeof getDb>, dateString: string, orders: OrderRecord[]): Promise<void> {
     console.log(`[DailyChallengeAggregator] Aggregating strains...`);
 
     const stats = new Map<string, { salesVolumeGrams: number; orderCount: number }>();
@@ -232,7 +234,7 @@ export class DailyChallengeAggregator {
   /**
    * Aggregate pharmacy stats and calculate scores
    */
-  private async aggregatePharmacies(dateString: string, orders: OrderRecord[]): Promise<void> {
+  private async aggregatePharmacies(db: ReturnType<typeof getDb>, dateString: string, orders: OrderRecord[]): Promise<void> {
     console.log(`[DailyChallengeAggregator] Aggregating pharmacies...`);
 
     const stats = new Map<string, { orderCount: number; revenueCents: number }>();
@@ -296,7 +298,7 @@ export class DailyChallengeAggregator {
   /**
    * Aggregate brand stats and calculate scores
    */
-  private async aggregateBrands(dateString: string, orders: OrderRecord[]): Promise<void> {
+  private async aggregateBrands(db: ReturnType<typeof getDb>, dateString: string, orders: OrderRecord[]): Promise<void> {
     console.log(`[DailyChallengeAggregator] Aggregating brands from ratings data...`);
 
     // Brands use ratings data, not order data
