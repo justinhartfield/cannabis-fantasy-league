@@ -58,6 +58,7 @@ export const scoringRouter = router({
 
   /**
    * Calculate scores for a daily challenge date
+   * Accessible to all authenticated users
    */
   calculateChallengeDay: protectedProcedure
     .input(z.object({
@@ -65,9 +66,8 @@ export const scoringRouter = router({
       statDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new Error('Unauthorized: Admin access required');
-      }
+      // Allow all authenticated users to trigger score calculations
+      // This enables the "Update Scores Now" button for everyone
 
       try {
         await calculateDailyChallengeScores(input.challengeId, input.statDate);
