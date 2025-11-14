@@ -3,7 +3,7 @@
  * Optimized for single-day performance tracking
  */
 
-import { pgTable, serial, integer, date, timestamp, index, unique } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, date, timestamp, index, unique, decimal } from 'drizzle-orm/pg-core';
 import { manufacturers } from './schema';
 import { strains } from './schema';
 import { pharmacies } from './schema';
