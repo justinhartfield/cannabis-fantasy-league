@@ -7,7 +7,8 @@ import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { sendLeagueInvitation, sendWelcomeEmail } from "./emailService";
 import { getRawClient } from './db';
-import cuid from "cuid";
+// CUID should be removed
+// import cuid from "cuid";
 
 /**
  * Invitation Router
@@ -138,7 +139,8 @@ export const invitationRouter = router({
           invitedBy: ctx.user.id,
           expiresAt: expiresAt,
           status: "pending",
-          id: cuid(),
+          // The manual ID assignment should be removed
+          // id: cuid(),
         })
         .returning({ id: invitations.id });
       
