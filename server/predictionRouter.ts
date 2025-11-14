@@ -8,9 +8,35 @@ import {
 } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 
+// Lazy initialization helper
+let isInitialized = false;
+async function ensureMatchupsExist() {
+  if (isInitialized) return;
+  
+  const db = await getDb();
+  if (!db) return;
+  
+  const today = new Date().toISOString().split('T')[0];
+  const existing = await db
+    .select()
+    .from(dailyMatchups)
+    .where(eq(dailyMatchups.matchupDate, today))
+    .limit(1);
+  
+  if (existing.length === 0) {
+    console.log('[PredictionRouter] No matchups found, triggering generation...');
+    const { generateDailyMatchups } = await import('./predictionService');
+    await generateDailyMatchups();
+  }
+  
+  isInitialized = true;
+}
+
 export const predictionRouter = router({
   
   getDailyMatchups: protectedProcedure.query(async ({ ctx }) => {
+    // Ensure matchups exist (lazy initialization)
+    await ensureMatchupsExist();
     const db = await getDb();
     if (!db) {
       throw new Error("Database not available");
