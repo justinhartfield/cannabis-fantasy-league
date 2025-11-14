@@ -12,6 +12,7 @@ import ScoringBreakdown from "@/components/ScoringBreakdown";
 import { StatBadge } from "@/components/StatBadge";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { CoinFlip } from "@/components/CoinFlip";
+import { TopPerformerCard } from "@/components/TopPerformerCard";
 import {
   Loader2,
   ArrowLeft,
@@ -647,42 +648,25 @@ export default function DailyChallenge() {
           </CardContent>
         </Card>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {
-              label: "Score Differenz",
-              value: `${scoreDiff >= 0 ? "+" : ""}${scoreDiff.toFixed(1)}`,
-              icon: Flame,
-              variant: "primary" as const,
-            },
-            {
-              label: "Aktive Teams",
-              value: activeTeamCount,
-              icon: Sparkles,
-              variant: "secondary" as const,
-            },
-            {
-              label: "Dein Team",
-              value: userTeam ? "Aktiv" : "Zuschauer",
-              icon: UserCircle,
-              variant: "purple" as const,
-            },
-          ].map((stat, index) => (
-            <div
-              key={stat.label}
-              className="slide-in-bottom"
-              style={{ animationDelay: `${index * 0.08}s` }}
-            >
-              <StatBadge
-                label={stat.label}
-                value={stat.value}
-                icon={stat.icon}
-                variant={stat.variant}
-              />
-            </div>
-          ))}
-        </div>
+        {/* Game Leaders */}
+        {topPerformers.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {topPerformers.map((performer, index) => (
+              <div
+                key={performer.name}
+                className="slide-in-bottom"
+                style={{ animationDelay: `${index * 0.08}s` }}
+              >
+                <TopPerformerCard
+                  performer={performer}
+                  icon={Flame}
+                  label={`Top Performer #${index + 1}`}
+                  variant={index === 0 ? "primary" : index === 1 ? "secondary" : "purple"}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Leaderboard */}
         <Card className="border-border/50 bg-card/80 slide-in-bottom">
