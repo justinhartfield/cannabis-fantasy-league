@@ -33,7 +33,9 @@ export default function Dashboard() {
     );
   }
 
-  const hasLeagues = myLeagues && myLeagues.length > 0;
+  const seasonLeagues = myLeagues?.filter(l => l.leagueType !== 'challenge') || [];
+  const challengeLeagues = myLeagues?.filter(l => l.leagueType === 'challenge') || [];
+  const hasLeagues = seasonLeagues.length > 0;
 
   return (
     <div className="min-h-screen gradient-dark">
@@ -167,7 +169,7 @@ export default function Dashboard() {
             <div>
               <h3 className="text-2xl font-bold text-foreground">My Leagues</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                {hasLeagues ? `${myLeagues?.length} active leagues` : "Get started with your first league"}
+                {hasLeagues ? `${seasonLeagues.length} active ${seasonLeagues.length === 1 ? 'league' : 'leagues'}` : "Get started with your first league"}
               </p>
             </div>
             {hasLeagues && (
