@@ -624,20 +624,24 @@ export async function calculateTeamScore(teamId: number, year: number, week: num
  * Calculate score for a single team for a specific challenge day
  */
 export async function calculateTeamDailyScore(teamId: number, challengeId: number, statDate: string): Promise<number> {
+  console.log(`[calculateTeamDailyScore] Starting calculation for team ${teamId}, challenge ${challengeId}, date ${statDate}`);
   const normalizedDate = new Date(`${statDate}T00:00:00Z`);
   if (Number.isNaN(normalizedDate.getTime())) {
     throw new Error(`Invalid stat date: ${statDate}`);
   }
   const { year, week } = getIsoYearWeek(normalizedDate);
   const dateString = normalizedDate.toISOString().split('T')[0];
+  console.log(`[calculateTeamDailyScore] Using year=${year}, week=${week}, dateString=${dateString}`);
 
-  return computeTeamScore({
+  const score = await computeTeamScore({
     teamId,
     lineupYear: year,
     lineupWeek: week,
     scope: { type: 'daily', statDate: dateString },
     persistence: { mode: 'daily', teamId, challengeId, statDate: dateString },
   });
+  console.log(`[calculateTeamDailyScore] Calculated score for team ${teamId}: ${score} points`);
+  return score;
 }
 
 /**
@@ -669,8 +673,12 @@ export async function calculateDailyChallengeScores(challengeId: number, statDat
     .from(teams)
     .where(eq(teams.leagueId, challengeId));
 
+  console.log(`[calculateDailyChallengeScores] Found ${challengeTeams.length} teams in challenge ${challengeId}`);
+  console.log(`[calculateDailyChallengeScores] Using stat date: ${statDateString}`);
+  
   for (const team of challengeTeams) {
     try {
+      console.log(`[calculateDailyChallengeScores] Processing team ${team.id} (${team.name})`);
       await calculateTeamDailyScore(team.id, challengeId, statDateString);
     } catch (error) {
       console.error(`[Scoring] Error calculating daily score for team ${team.id}:`, error);
