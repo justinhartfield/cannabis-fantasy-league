@@ -124,18 +124,19 @@ export default function ScoringBreakdown({
                 key={idx}
                 className="flex items-center justify-between p-2 rounded-md bg-muted/50"
               >
-                <div className="flex items-center gap-1">
-                  <div>
-                    <div className="text-sm font-medium text-foreground flex items-center gap-1">
-                      {component.category}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {component.formula}
-                    </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-foreground mb-1">
+                    {component.category}
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    {component.value} × {component.formula} = {component.points} pts
                   </div>
                 </div>
-                <div className="text-sm font-semibold text-foreground">
-                  +{component.points}
+                <div className="text-right">
+                  <div className="text-lg font-bold text-foreground">
+                    {component.points}
+                  </div>
+                  <div className="text-xs text-muted-foreground">pts</div>
                 </div>
               </div>
             ))}
@@ -203,9 +204,26 @@ export default function ScoringBreakdown({
         )}
 
         {/* Subtotal */}
-        <div className="flex items-center justify-between p-3 rounded-md bg-muted border-t border-border">
-          <div className="text-sm font-semibold text-foreground">Zwischensumme</div>
-          <div className="text-lg font-bold text-foreground">{data.subtotal}</div>
+        <div className="border-t border-border pt-3 mt-3">
+          <div className="flex items-center justify-between p-3 rounded-md bg-muted/80">
+            <div>
+              <div className="text-sm font-semibold text-foreground">Zwischensumme</div>
+              <div className="text-xs text-muted-foreground font-mono mt-1">
+                {data.components.map((c, i) => (
+                  <span key={i}>
+                    {i > 0 && ' + '}{c.points}
+                  </span>
+                ))}
+                {data.bonuses.length > 0 && data.bonuses.map((b, i) => (
+                  <span key={`b${i}`}> + {b.points}</span>
+                ))}
+                {data.penalties.length > 0 && data.penalties.map((p, i) => (
+                  <span key={`p${i}`}> {p.points}</span>
+                ))}
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-foreground">{data.total}</div>
+          </div>
         </div>
 
         {/* League Average Comparison */}
