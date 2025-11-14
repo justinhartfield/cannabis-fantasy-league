@@ -1,7 +1,7 @@
-import sgMail from '@sendgrid/mail';
+import * as postmark from 'postmark';
 
 /**
- * Email Service using SendGrid
+ * Email Service using Postmark
  * 
  * Handles all email sending functionality:
  * - League invitations
@@ -11,16 +11,17 @@ import sgMail from '@sendgrid/mail';
  * - Weekly recaps
  */
 
-// Initialize SendGrid
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
-const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@cannabis-fantasy-league.com';
+// Initialize Postmark
+const POSTMARK_API_KEY = process.env.POSTMARK_API_KEY || '';
+const FROM_EMAIL = process.env.POSTMARK_FROM_EMAIL || 'noreply@cannabis-fantasy-league.com';
 const APP_URL = process.env.APP_URL || 'http://localhost:3001';
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-  console.log('[EmailService] SendGrid initialized');
+let client: postmark.ServerClient | null = null;
+if (POSTMARK_API_KEY) {
+  client = new postmark.ServerClient(POSTMARK_API_KEY);
+  console.log('[EmailService] Postmark initialized');
 } else {
-  console.warn('[EmailService] SENDGRID_API_KEY not set - emails will not be sent');
+  console.warn('[EmailService] POSTMARK_API_KEY not set - emails will not be sent');
 }
 
 export interface EmailOptions {
@@ -34,21 +35,21 @@ export interface EmailOptions {
  * Send a generic email
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  if (!SENDGRID_API_KEY) {
+  if (!client) {
     console.warn('[EmailService] Email not sent - API key not configured');
     return false;
   }
 
   try {
     const msg = {
-      to: options.to,
-      from: FROM_EMAIL,
-      subject: options.subject,
-      html: options.html,
-      text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+      To: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+      From: FROM_EMAIL,
+      Subject: options.subject,
+      HtmlBody: options.html,
+      TextBody: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
     };
 
-    await sgMail.send(msg);
+    await client.sendEmail(msg);
     console.log(`[EmailService] Email sent to ${Array.isArray(options.to) ? options.to.join(', ') : options.to}`);
     return true;
   } catch (error) {
