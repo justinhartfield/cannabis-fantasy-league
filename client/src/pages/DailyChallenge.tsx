@@ -690,24 +690,22 @@ export default function DailyChallenge() {
                 <Trophy className="w-5 h-5 text-primary" />
                 Leaderboard
               </CardTitle>
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-border/50"
-                  onClick={handleCalculateScores}
-                  disabled={isCalculating || calculateChallengeDayMutation.isPending}
-                >
-                  {isCalculating || calculateChallengeDayMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Calc...
-                    </>
-                  ) : (
-                    "Calculate Scores"
-                  )}
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-border/50"
+                onClick={handleCalculateScores}
+                disabled={isCalculating || calculateChallengeDayMutation.isPending}
+              >
+                {isCalculating || calculateChallengeDayMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Scores Now"
+                )}
+              </Button>
             </div>
             <CardDescription>
               Woche {currentWeek} • {currentYear}
