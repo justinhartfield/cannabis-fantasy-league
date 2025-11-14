@@ -21,6 +21,7 @@ import {
   dailyScoringBreakdowns,
 } from '../drizzle/schema';
 import { eq, and, inArray } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 export const scoringRouter = router({
   /**
@@ -377,7 +378,7 @@ export const scoringRouter = router({
           .where(and(
             eq(dailyTeamScores.teamId, team.id),
             eq(dailyTeamScores.challengeId, input.challengeId),
-            eq(dailyTeamScores.statDate, input.statDate)
+            eq(dailyTeamScores.statDate, input.statDate as any) // Cast to ensure type compatibility
           ))
           .limit(1);
 
@@ -421,7 +422,7 @@ export const scoringRouter = router({
         .where(and(
           eq(dailyTeamScores.teamId, input.teamId),
           eq(dailyTeamScores.challengeId, input.challengeId),
-          eq(dailyTeamScores.statDate, input.statDate)
+          eq(dailyTeamScores.statDate, input.statDate as any) // Cast to ensure type compatibility
         ))
         .limit(1);
 

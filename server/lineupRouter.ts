@@ -50,7 +50,7 @@ export const lineupRouter = router({
             teamId: input.teamId,
             year: input.year,
             week: input.week,
-            isLocked: false,
+            isLocked: 0, // Changed from false to 0 (integer)
           });
 
         return {

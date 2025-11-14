@@ -6,6 +6,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { sendLeagueInvitation, sendWelcomeEmail } from "./emailService";
+import { getRawClient } from './db';
 
 /**
  * Invitation Router
@@ -126,14 +127,19 @@ export const invitationRouter = router({
       const token = generateInvitationToken();
       const expiresAt = getExpirationDate();
 
-      // Create invitation
-      const insertResult = await db.execute(sql`
-        INSERT INTO "invitations" ("leagueId", "email", "token", "invitedBy", "expiresAt")
-        VALUES (${input.leagueId}, ${input.email}, ${token}, ${ctx.user.id}, ${expiresAt})
-        RETURNING "id"
-      `);
-
-      const invitationId = insertResult.rows?.[0]?.id;
+      // Create invitation using Drizzle insert
+      const [newInvitation] = await db
+        .insert(invitations)
+        .values({
+          leagueId: input.leagueId,
+          email: input.email,
+          token: token,
+          invitedBy: ctx.user.id,
+          expiresAt: expiresAt,
+        })
+        .returning({ id: invitations.id });
+      
+      const invitationId = newInvitation?.id;
 
       // Send invitation email
       const recipientName = input.recipientName || input.email.split('@')[0];
