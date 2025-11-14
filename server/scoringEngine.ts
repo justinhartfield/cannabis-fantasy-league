@@ -1325,12 +1325,13 @@ async function scoreBrand(brandId: number, scope: ScoreScope): Promise<{ points:
     });
   }
 
-  // For daily challenges, return pre-calculated points
+  // For daily challenges, return pre-calculated points based on ratings
   return {
     points: statRecord.totalPoints,
     breakdown: {
-      salesVolumeGrams: statRecord.salesVolumeGrams,
-      orderCount: statRecord.orderCount,
+      totalRatings: statRecord.totalRatings,
+      averageRating: statRecord.averageRating,
+      bayesianAverage: statRecord.bayesianAverage,
       rank: statRecord.rank,
     }
   };

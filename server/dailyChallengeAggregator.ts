@@ -297,46 +297,60 @@ export class DailyChallengeAggregator {
    * Aggregate brand stats and calculate scores
    */
   private async aggregateBrands(dateString: string, orders: OrderRecord[]): Promise<void> {
-    console.log(`[DailyChallengeAggregator] Aggregating brands...`);
+    console.log(`[DailyChallengeAggregator] Aggregating brands from ratings data...`);
 
-    const stats = new Map<string, { salesVolumeGrams: number; orderCount: number }>();
-
-    for (const order of orders) {
-      const name = order.ProductBrand;
-      if (!name) continue;
-
-      const quantity = order.Quantity || 0;
-
-      const current = stats.get(name) || { salesVolumeGrams: 0, orderCount: 0 };
-      current.salesVolumeGrams += quantity;
-      current.orderCount += 1;
-      stats.set(name, current);
+    // Brands use ratings data, not order data
+    // Fetch from Metabase question that aggregates brand ratings
+    // Note: The ratings are cumulative, not daily, so we use the latest snapshot
+    const ratingsData = await this.fetchBrandRatings();
+    
+    if (!ratingsData || ratingsData.length === 0) {
+      console.log(`[DailyChallengeAggregator] No brand ratings data found`);
+      return;
     }
 
-    const sorted = Array.from(stats.entries()).sort((a, b) => b[1].salesVolumeGrams - a[1].salesVolumeGrams);
+    // Sort by total ratings (engagement) to determine rank
+    const sorted = ratingsData
+      .filter(b => b.totalRatings > 0) // Only include brands with ratings
+      .sort((a, b) => b.totalRatings - a.totalRatings);
 
     for (let i = 0; i < sorted.length; i++) {
-      const [name, data] = sorted[i];
+      const brandData = sorted[i];
       const rank = i + 1;
 
       const brand = await db.query.brands.findFirst({
-        where: (brands, { eq }) => eq(brands.name, name),
+        where: (brands, { eq }) => eq(brands.name, brandData.name),
       });
 
       if (!brand) {
-        console.log(`[DailyChallengeAggregator] Brand not found: ${name}`);
+        console.log(`[DailyChallengeAggregator] Brand not found in DB: ${brandData.name}`);
         continue;
       }
 
-      const scoring = calculateBrandScore(data, rank);
+      const scoring = calculateBrandScore({
+        totalRatings: brandData.totalRatings,
+        averageRating: brandData.averageRating,
+        bayesianAverage: brandData.bayesianAverage,
+        veryGoodCount: brandData.veryGoodCount,
+        goodCount: brandData.goodCount,
+        acceptableCount: brandData.acceptableCount,
+        badCount: brandData.badCount,
+        veryBadCount: brandData.veryBadCount,
+      }, rank);
 
       await db
         .insert(db.schema.brandDailyChallengeStats)
         .values({
           brandId: brand.id,
           statDate: dateString,
-          salesVolumeGrams: data.salesVolumeGrams,
-          orderCount: data.orderCount,
+          totalRatings: brandData.totalRatings,
+          averageRating: brandData.averageRating.toString(),
+          bayesianAverage: brandData.bayesianAverage.toString(),
+          veryGoodCount: brandData.veryGoodCount,
+          goodCount: brandData.goodCount,
+          acceptableCount: brandData.acceptableCount,
+          badCount: brandData.badCount,
+          veryBadCount: brandData.veryBadCount,
           totalPoints: scoring.totalPoints,
           rank,
           createdAt: new Date(),
@@ -345,15 +359,61 @@ export class DailyChallengeAggregator {
         .onConflictDoUpdate({
           target: [db.schema.brandDailyChallengeStats.brandId, db.schema.brandDailyChallengeStats.statDate],
           set: {
-            salesVolumeGrams: data.salesVolumeGrams,
-            orderCount: data.orderCount,
+            totalRatings: brandData.totalRatings,
+            averageRating: brandData.averageRating.toString(),
+            bayesianAverage: brandData.bayesianAverage.toString(),
+            veryGoodCount: brandData.veryGoodCount,
+            goodCount: brandData.goodCount,
+            acceptableCount: brandData.acceptableCount,
+            badCount: brandData.badCount,
+            veryBadCount: brandData.veryBadCount,
             totalPoints: scoring.totalPoints,
             rank,
             updatedAt: new Date(),
           },
         });
 
-      console.log(`[DailyChallengeAggregator] ${name}: ${data.salesVolumeGrams}g, ${scoring.totalPoints} pts (rank #${rank})`);
+      console.log(`[DailyChallengeAggregator] ${brandData.name}: ${brandData.totalRatings} ratings, avg ${brandData.averageRating}, ${scoring.totalPoints} pts (rank #${rank})`);
+    }
+  }
+
+  /**
+   * Fetch brand ratings from Metabase
+   * Uses the brand ratings aggregation query
+   */
+  private async fetchBrandRatings(): Promise<Array<{
+    name: string;
+    totalRatings: number;
+    averageRating: number;
+    bayesianAverage: number;
+    veryGoodCount: number;
+    goodCount: number;
+    acceptableCount: number;
+    badCount: number;
+    veryBadCount: number;
+  }>> {
+    try {
+      // The Metabase query URL provided shows this is a custom aggregation
+      // We need to execute it as a card query
+      // For now, we'll use a placeholder card ID - you'll need to save the query and get the ID
+      const BRAND_RATINGS_CARD_ID = 1265; // TODO: Update with actual saved question ID
+      
+      const result = await this.metabase.executeCardQuery(BRAND_RATINGS_CARD_ID, {});
+      
+      return result.map((row: any) => ({
+        name: row.Name || row.name,
+        totalRatings: parseInt(row['Sum of TotalRatings'] || row.totalRatings || '0'),
+        averageRating: parseFloat(row['Average of AverageRating'] || row.averageRating || '0'),
+        bayesianAverage: parseFloat(row['Average of BayesianAverage'] || row.bayesianAverage || '0'),
+        veryGoodCount: parseInt(row['Sum of RatingCounts: VeryGoodCount'] || row.veryGoodCount || '0'),
+        goodCount: parseInt(row['Sum of RatingCounts: GoodCount'] || row.goodCount || '0'),
+        acceptableCount: parseInt(row['Sum of RatingCounts: AcceptableCount'] || row.acceptableCount || '0'),
+        badCount: parseInt(row['Sum of RatingCounts: BadCount'] || row.badCount || '0'),
+        veryBadCount: parseInt(row['Sum of RatingCounts: VeryBadCount'] || row.veryBadCount || '0'),
+      }));
+    } catch (error) {
+      console.error('[DailyChallengeAggregator] Error fetching brand ratings:', error);
+      return [];
     }
   }
 }

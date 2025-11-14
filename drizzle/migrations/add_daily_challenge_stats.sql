@@ -53,13 +53,19 @@ CREATE TABLE IF NOT EXISTS "pharmacyDailyChallengeStats" (
 CREATE INDEX IF NOT EXISTS "pharmacy_daily_challenge_date_idx" ON "pharmacyDailyChallengeStats"("statDate");
 CREATE INDEX IF NOT EXISTS "pharmacy_daily_challenge_rank_idx" ON "pharmacyDailyChallengeStats"("statDate", "rank");
 
--- Brand Daily Challenge Stats
+-- Brand Daily Challenge Stats (uses ratings, not sales)
 CREATE TABLE IF NOT EXISTS "brandDailyChallengeStats" (
   "id" SERIAL PRIMARY KEY,
   "brandId" INTEGER NOT NULL REFERENCES "brands"("id") ON DELETE CASCADE,
   "statDate" DATE NOT NULL,
-  "salesVolumeGrams" INTEGER DEFAULT 0 NOT NULL,
-  "orderCount" INTEGER DEFAULT 0 NOT NULL,
+  "totalRatings" INTEGER DEFAULT 0 NOT NULL,
+  "averageRating" DECIMAL(3,2) DEFAULT 0 NOT NULL,
+  "bayesianAverage" DECIMAL(3,2) DEFAULT 0 NOT NULL,
+  "veryGoodCount" INTEGER DEFAULT 0 NOT NULL,
+  "goodCount" INTEGER DEFAULT 0 NOT NULL,
+  "acceptableCount" INTEGER DEFAULT 0 NOT NULL,
+  "badCount" INTEGER DEFAULT 0 NOT NULL,
+  "veryBadCount" INTEGER DEFAULT 0 NOT NULL,
   "totalPoints" INTEGER DEFAULT 0 NOT NULL,
   "rank" INTEGER DEFAULT 0,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,

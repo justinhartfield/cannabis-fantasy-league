@@ -7,12 +7,23 @@ export interface DailyChallengeStats {
   salesVolumeGrams?: number;
   orderCount?: number;
   revenueCents?: number;
+  // Brand-specific fields
+  totalRatings?: number;
+  averageRating?: number | string;
+  bayesianAverage?: number | string;
+  veryGoodCount?: number;
+  goodCount?: number;
+  acceptableCount?: number;
+  badCount?: number;
+  veryBadCount?: number;
 }
 
 export interface ScoringBreakdown {
   salesVolumePoints: number;
   orderCountPoints: number;
   revenuePoints: number;
+  ratingCountPoints?: number;
+  ratingQualityPoints?: number;
   rankBonusPoints: number;
   totalPoints: number;
 }
@@ -112,30 +123,35 @@ export function calculatePharmacyScore(
 }
 
 /**
- * Calculate brand daily challenge score
+ * Calculate brand daily challenge score based on ratings
+ * Brands are scored differently from manufacturers/pharmacies
+ * They use user ratings data instead of sales volume
  */
 export function calculateBrandScore(
   stats: DailyChallengeStats,
   rank: number = 0
 ): ScoringBreakdown {
-  const salesVolumeGrams = stats.salesVolumeGrams || 0;
-  const orderCount = stats.orderCount || 0;
+  const totalRatings = stats.totalRatings || 0;
+  const averageRating = parseFloat(stats.averageRating?.toString() || '0');
+  const bayesianAverage = parseFloat(stats.bayesianAverage?.toString() || '0');
 
-  // Sales Volume: 1 point per 10g sold
-  const salesVolumePoints = Math.floor(salesVolumeGrams / 10);
+  // Rating Count: 10 points per rating received
+  const ratingCountPoints = totalRatings * 10;
 
-  // Order Count: 5 points per order
-  const orderCountPoints = orderCount * 5;
+  // Rating Quality: 20 points per star (based on Bayesian average to prevent gaming)
+  const ratingQualityPoints = Math.floor(bayesianAverage * 20);
 
-  // Top Brand Bonus: +35 points for #1 brand
-  const rankBonusPoints = rank === 1 ? 35 : 0;
+  // Top Brand Bonus: +50 points for #1 brand by ratings
+  const rankBonusPoints = rank === 1 ? 50 : 0;
 
-  const totalPoints = salesVolumePoints + orderCountPoints + rankBonusPoints;
+  const totalPoints = ratingCountPoints + ratingQualityPoints + rankBonusPoints;
 
   return {
-    salesVolumePoints,
-    orderCountPoints,
+    salesVolumePoints: 0,
+    orderCountPoints: 0,
     revenuePoints: 0,
+    ratingCountPoints,
+    ratingQualityPoints,
     rankBonusPoints,
     totalPoints,
   };
