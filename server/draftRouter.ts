@@ -258,7 +258,7 @@ export const draftRouter = router({
         yesterdayStatDate,
       });
 
-      return available.map((strain) => ({
+      const result = available.map((strain) => ({
         id: strain.id,
         name: strain.name,
         type: strain.type || "Unknown",
@@ -270,6 +270,14 @@ export const draftRouter = router({
         yesterdayStatDate,
         // TODO: Add more stats
       }));
+      
+      console.log('[getAvailableCannabisStrains] Sample data:', result.slice(0, 3).map(s => ({
+        name: s.name,
+        yesterdayPoints: s.yesterdayPoints,
+        todayPoints: s.todayPoints
+      })));
+      
+      return result;
     }),
 
   /**
@@ -332,7 +340,7 @@ export const draftRouter = router({
         yesterdayStatDate,
       });
 
-      return available.map((product) => ({
+      const result = available.map((product) => ({
         id: product.id,
         name: product.name,
         manufacturer: product.manufacturerName || "Unknown",
@@ -345,6 +353,14 @@ export const draftRouter = router({
         yesterdayStatDate,
         // TODO: Add more stats
       }));
+      
+      console.log('[getAvailableProducts] Sample data:', result.slice(0, 3).map(p => ({
+        name: p.name,
+        yesterdayPoints: p.yesterdayPoints,
+        todayPoints: p.todayPoints
+      })));
+      
+      return result;
     }),
 
   /**
