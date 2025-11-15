@@ -121,6 +121,7 @@ export const cannabisStrains = pgTable("cannabisStrains", {
 	metabaseId: varchar({ length: 64 }).notNull(),
 	name: varchar({ length: 255 }).notNull(),
 	slug: varchar({ length: 255 }),
+	imageUrl: varchar({ length: 500 }),
 	type: varchar({ length: 50 }),
 	description: text(),
 	effects: text(),
@@ -277,6 +278,7 @@ export const manufacturerDailyStats = pgTable("manufacturerDailyStats", {
 export const manufacturers = pgTable("manufacturers", {
 	id: serial().notNull(),
 	name: varchar({ length: 255 }).notNull(),
+	logoUrl: varchar({ length: 500 }),
 	currentRank: integer(),
 	weeklyRank: integer(),
 	monthlyRank: integer(),
@@ -311,6 +313,7 @@ export const matchups = pgTable("matchups", {
 export const pharmacies = pgTable("pharmacies", {
 	id: serial().notNull(),
 	name: varchar({ length: 255 }).notNull(),
+	logoUrl: varchar({ length: 500 }),
 	city: varchar({ length: 100 }),
 	state: varchar({ length: 100 }),
 	productCount: integer().default(0).notNull(),
