@@ -51,7 +51,15 @@ function getDraftDates() {
 }
 
 /**
- * Helper function to fetch daily challenge scores for an entity
+ * In-memory cache for daily scores
+ * Key format: "tableName:entityId:date"
+ * Cache is cleared daily when dates change
+ */
+const dailyScoresCache = new Map<string, number>();
+let cachedDates: { yesterday: string; today: string } | null = null;
+
+/**
+ * Helper function to fetch daily challenge scores for an entity with caching
  */
 async function getDailyScores(
   db: any,
@@ -61,25 +69,168 @@ async function getDailyScores(
 ): Promise<{ yesterday: number; today: number }> {
   const dates = getDraftDates();
   
-  const [yesterdayStats, todayStats] = await Promise.all([
-    db.select().from(table).where(
-      and(
-        eq(table[idField], entityId),
-        eq(table.statDate, dates.yesterday)
-      )
-    ).limit(1),
-    db.select().from(table).where(
-      and(
-        eq(table[idField], entityId),
-        eq(table.statDate, dates.today)
-      )
-    ).limit(1),
-  ]);
+  // Clear cache if dates have changed (new day)
+  if (!cachedDates || cachedDates.yesterday !== dates.yesterday || cachedDates.today !== dates.today) {
+    dailyScoresCache.clear();
+    cachedDates = dates;
+  }
+  
+  const tableName = table._.name || 'unknown';
+  const yesterdayKey = `${tableName}:${entityId}:${dates.yesterday}`;
+  const todayKey = `${tableName}:${entityId}:${dates.today}`;
+  
+  // Check cache first
+  let yesterdayPoints = dailyScoresCache.get(yesterdayKey);
+  let todayPoints = dailyScoresCache.get(todayKey);
+  
+  // Fetch missing data from database
+  const queries = [];
+  if (yesterdayPoints === undefined) {
+    queries.push(
+      db.select().from(table).where(
+        and(
+          eq(table[idField], entityId),
+          eq(table.statDate, dates.yesterday)
+        )
+      ).limit(1)
+    );
+  } else {
+    queries.push(Promise.resolve([{ totalPoints: yesterdayPoints }]));
+  }
+  
+  if (todayPoints === undefined) {
+    queries.push(
+      db.select().from(table).where(
+        and(
+          eq(table[idField], entityId),
+          eq(table.statDate, dates.today)
+        )
+      ).limit(1)
+    );
+  } else {
+    queries.push(Promise.resolve([{ totalPoints: todayPoints }]));
+  }
+  
+  const [yesterdayStats, todayStats] = await Promise.all(queries);
+  
+  // Update cache
+  yesterdayPoints = yesterdayStats[0]?.totalPoints || 0;
+  todayPoints = todayStats[0]?.totalPoints || 0;
+  dailyScoresCache.set(yesterdayKey, yesterdayPoints);
+  dailyScoresCache.set(todayKey, todayPoints);
   
   return {
-    yesterday: yesterdayStats[0]?.totalPoints || 0,
-    today: todayStats[0]?.totalPoints || 0,
+    yesterday: yesterdayPoints,
+    today: todayPoints,
   };
+}
+
+/**
+ * Batch fetch daily scores for multiple entities at once
+ * Reduces N queries to 2 queries (yesterday + today)
+ */
+async function getBatchDailyScores(
+  db: any,
+  table: any,
+  idField: string,
+  entityIds: number[]
+): Promise<Map<number, { yesterday: number; today: number }>> {
+  const dates = getDraftDates();
+  
+  // Clear cache if dates have changed
+  if (!cachedDates || cachedDates.yesterday !== dates.yesterday || cachedDates.today !== dates.today) {
+    dailyScoresCache.clear();
+    cachedDates = dates;
+  }
+  
+  const tableName = table._.name || 'unknown';
+  const results = new Map<number, { yesterday: number; today: number }>();
+  
+  // Check which entities need fetching
+  const needYesterday: number[] = [];
+  const needToday: number[] = [];
+  
+  for (const entityId of entityIds) {
+    const yesterdayKey = `${tableName}:${entityId}:${dates.yesterday}`;
+    const todayKey = `${tableName}:${entityId}:${dates.today}`;
+    
+    const cachedYesterday = dailyScoresCache.get(yesterdayKey);
+    const cachedToday = dailyScoresCache.get(todayKey);
+    
+    if (cachedYesterday !== undefined && cachedToday !== undefined) {
+      // Both in cache
+      results.set(entityId, {
+        yesterday: cachedYesterday,
+        today: cachedToday,
+      });
+    } else {
+      // Need to fetch
+      if (cachedYesterday === undefined) needYesterday.push(entityId);
+      if (cachedToday === undefined) needToday.push(entityId);
+      
+      // Initialize with cached or 0
+      results.set(entityId, {
+        yesterday: cachedYesterday || 0,
+        today: cachedToday || 0,
+      });
+    }
+  }
+  
+  // Batch fetch missing data
+  const queries = [];
+  
+  if (needYesterday.length > 0) {
+    queries.push(
+      db.select().from(table).where(
+        and(
+          inArray(table[idField], needYesterday),
+          eq(table.statDate, dates.yesterday)
+        )
+      )
+    );
+  } else {
+    queries.push(Promise.resolve([]));
+  }
+  
+  if (needToday.length > 0) {
+    queries.push(
+      db.select().from(table).where(
+        and(
+          inArray(table[idField], needToday),
+          eq(table.statDate, dates.today)
+        )
+      )
+    );
+  } else {
+    queries.push(Promise.resolve([]));
+  }
+  
+  const [yesterdayStats, todayStats] = await Promise.all(queries);
+  
+  // Update results and cache
+  for (const stat of yesterdayStats) {
+    const entityId = stat[idField];
+    const points = stat.totalPoints || 0;
+    const key = `${tableName}:${entityId}:${dates.yesterday}`;
+    
+    dailyScoresCache.set(key, points);
+    const existing = results.get(entityId) || { yesterday: 0, today: 0 };
+    existing.yesterday = points;
+    results.set(entityId, existing);
+  }
+  
+  for (const stat of todayStats) {
+    const entityId = stat[idField];
+    const points = stat.totalPoints || 0;
+    const key = `${tableName}:${entityId}:${dates.today}`;
+    
+    dailyScoresCache.set(key, points);
+    const existing = results.get(entityId) || { yesterday: 0, today: 0 };
+    existing.today = points;
+    results.set(entityId, existing);
+  }
+  
+  return results;
 }
 
 /**
@@ -167,25 +318,27 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      // Fetch daily scores for each manufacturer
-      const withScores = await Promise.all(
-        available.map(async (mfg) => {
-          const dailyScores = await getDailyScores(
-            db,
-            manufacturerDailyChallengeStats,
-            'manufacturerId',
-            mfg.id
-          );
-          return {
-            id: mfg.id,
-            name: mfg.name,
-            logoUrl: mfg.logoUrl,
-            productCount: mfg.productCount || 0,
-            yesterdayPoints: dailyScores.yesterday,
-            todayPoints: dailyScores.today,
-          };
-        })
+      // Batch fetch daily scores for all manufacturers
+      const entityIds = available.map(mfg => mfg.id);
+      const scoresMap = await getBatchDailyScores(
+        db,
+        manufacturerDailyChallengeStats,
+        'manufacturerId',
+        entityIds
       );
+
+      // Map scores to manufacturers
+      const withScores = available.map((mfg) => {
+        const scores = scoresMap.get(mfg.id) || { yesterday: 0, today: 0 };
+        return {
+          id: mfg.id,
+          name: mfg.name,
+          logoUrl: mfg.logoUrl,
+          productCount: mfg.productCount || 0,
+          yesterdayPoints: scores.yesterday,
+          todayPoints: scores.today,
+        };
+      });
 
       return withScores;
     }),
@@ -241,27 +394,29 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      // Fetch daily scores for each cannabis strain
-      const withScores = await Promise.all(
-        available.map(async (strain) => {
-          const dailyScores = await getDailyScores(
-            db,
-            strainDailyChallengeStats,
-            'strainId',
-            strain.id
-          );
-          return {
-            id: strain.id,
-            name: strain.name,
-            type: strain.type || "Unknown",
-            effects: parseJsonOrArray(strain.effects),
-            flavors: parseJsonOrArray(strain.flavors),
-            imageUrl: strain.imageUrl,
-            yesterdayPoints: dailyScores.yesterday,
-            todayPoints: dailyScores.today,
-          };
-        })
+      // Batch fetch daily scores for all cannabis strains
+      const entityIds = available.map(s => s.id);
+      const scoresMap = await getBatchDailyScores(
+        db,
+        strainDailyChallengeStats,
+        'strainId',
+        entityIds
       );
+
+      // Map scores to cannabis strains
+      const withScores = available.map((strain) => {
+        const scores = scoresMap.get(strain.id) || { yesterday: 0, today: 0 };
+        return {
+          id: strain.id,
+          name: strain.name,
+          type: strain.type || "Unknown",
+          effects: parseJsonOrArray(strain.effects),
+          flavors: parseJsonOrArray(strain.flavors),
+          imageUrl: strain.imageUrl,
+          yesterdayPoints: scores.yesterday,
+          todayPoints: scores.today,
+        };
+      });
 
       return withScores;
     }),
@@ -317,27 +472,29 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      // Fetch daily scores for each product
-      const withScores = await Promise.all(
-        available.map(async (product) => {
-          const dailyScores = await getDailyScores(
-            db,
-            productDailyChallengeStats,
-            'productId',
-            product.id
-          );
-          return {
-            id: product.id,
-            name: product.name,
-            manufacturer: product.manufacturer || "Unknown",
-            thcContent: product.thcContent || 0,
-            cbdContent: product.cbdContent || 0,
-            favoriteCount: product.favoriteCount || 0,
-            yesterdayPoints: dailyScores.yesterday,
-            todayPoints: dailyScores.today,
-          };
-        })
+      // Batch fetch daily scores for all products
+      const entityIds = available.map(p => p.id);
+      const scoresMap = await getBatchDailyScores(
+        db,
+        productDailyChallengeStats,
+        'productId',
+        entityIds
       );
+
+      // Map scores to products
+      const withScores = available.map((product) => {
+        const scores = scoresMap.get(product.id) || { yesterday: 0, today: 0 };
+        return {
+          id: product.id,
+          name: product.name,
+          manufacturer: product.manufacturer || "Unknown",
+          thcContent: product.thcContent || 0,
+          cbdContent: product.cbdContent || 0,
+          favoriteCount: product.favoriteCount || 0,
+          yesterdayPoints: scores.yesterday,
+          todayPoints: scores.today,
+        };
+      });
 
       return withScores;
     }),
@@ -393,24 +550,27 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      // Fetch daily scores for each pharmacy
-      const withScores = await Promise.all(
-        available.map(async (phm) => {
-          const dailyScores = await getDailyScores(
-            db,
-            pharmacyDailyChallengeStats,
-            'pharmacyId',
-            phm.id
-          );
-          return {
-            id: phm.id,
-            name: phm.name,
-            city: phm.city || "Unknown",
-            yesterdayPoints: dailyScores.yesterday,
-            todayPoints: dailyScores.today,
-          };
-        })
+      // Batch fetch daily scores for all pharmacies
+      const entityIds = available.map(p => p.id);
+      const scoresMap = await getBatchDailyScores(
+        db,
+        pharmacyDailyChallengeStats,
+        'pharmacyId',
+        entityIds
       );
+
+      // Map scores to pharmacies
+      const withScores = available.map((phm) => {
+        const scores = scoresMap.get(phm.id) || { yesterday: 0, today: 0 };
+        return {
+          id: phm.id,
+          name: phm.name,
+          city: phm.city || "Unknown",
+          logoUrl: phm.logoUrl,
+          yesterdayPoints: scores.yesterday,
+          todayPoints: scores.today,
+        };
+      });
 
       return withScores;
     }),
@@ -466,25 +626,28 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      // Fetch daily scores for each brand
-      const withScores = await Promise.all(
-        available.map(async (brand) => {
-          const dailyScores = await getDailyScores(
-            db,
-            brandDailyChallengeStats,
-            'brandId',
-            brand.id
-          );
-          return {
-            id: brand.id,
-            name: brand.name,
-            totalFavorites: brand.totalFavorites || 0,
-            totalViews: brand.totalViews || 0,
-            yesterdayPoints: dailyScores.yesterday,
-            todayPoints: dailyScores.today,
-          };
-        })
+      // Batch fetch daily scores for all brands
+      const entityIds = available.map(b => b.id);
+      const scoresMap = await getBatchDailyScores(
+        db,
+        brandDailyChallengeStats,
+        'brandId',
+        entityIds
       );
+
+      // Map scores to brands
+      const withScores = available.map((brand) => {
+        const scores = scoresMap.get(brand.id) || { yesterday: 0, today: 0 };
+        return {
+          id: brand.id,
+          name: brand.name,
+          logoUrl: brand.logoUrl,
+          totalFavorites: brand.totalFavorites || 0,
+          totalViews: brand.totalViews || 0,
+          yesterdayPoints: scores.yesterday,
+          todayPoints: scores.today,
+        };
+      });
 
       return withScores;
     }),
