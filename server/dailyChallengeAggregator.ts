@@ -289,6 +289,7 @@ export class DailyChallengeAggregator {
 
   /**
    * Aggregate strain stats and calculate scores
+   * Now uses Metabase public query for pre-aggregated strain data
    */
   private async aggregateStrains(
     db: Database,
@@ -296,50 +297,51 @@ export class DailyChallengeAggregator {
     orders: OrderRecord[],
     logger?: AggregationLogger
   ): Promise<EntityAggregationSummary> {
-    await this.log('info', 'Aggregating strains...', undefined, logger);
+    await this.log('info', 'Aggregating strains from Metabase public query...', undefined, logger);
 
-    const stats = new Map<string, { salesVolumeGrams: number; orderCount: number }>();
-
-    for (const order of orders) {
-      const name = order.ProductStrainName;
-      if (!name) continue;
-
-      const quantity = order.Quantity || 0;
-
-      const current = stats.get(name) || { salesVolumeGrams: 0, orderCount: 0 };
-      current.salesVolumeGrams += quantity;
-      current.orderCount += 1;
-      stats.set(name, current);
-    }
-
-    const sorted = Array.from(stats.entries()).sort((a, b) => b[1].salesVolumeGrams - a[1].salesVolumeGrams);
+    // Fetch pre-aggregated strain data from Metabase public query
+    // This query groups by ProductStrainName and returns aggregated metrics
+    const strainData = await this.metabase.executePublicQuery('fbaa0280-5995-43c3-b93b-7ac5da834bef');
+    
+    await this.log('info', `Fetched ${strainData.length} strains from Metabase`, undefined, logger);
 
     let processed = 0;
     let skipped = 0;
 
-    for (let i = 0; i < sorted.length; i++) {
-      const [name, data] = sorted[i];
+    for (let i = 0; i < strainData.length; i++) {
+      const item = strainData[i];
       const rank = i + 1;
+      
+      // Metabase query returns: Name, Quantity (grams), Sales, Orders, etc.
+      const name = item.Name;
+      if (!name) {
+        skipped += 1;
+        continue;
+      }
 
+      const salesVolumeGrams = item.Quantity || 0;
+      const orderCount = item.Orders || 0;
+
+      // Find the strain in our database
       const strain = await db.query.cannabisStrains.findFirst({
         where: (cannabisStrains, { eq }) => eq(cannabisStrains.name, name),
       });
 
       if (!strain) {
         skipped += 1;
-        await this.log('warn', `Strain not found: ${name}`, undefined, logger);
+        await this.log('warn', `Strain not found in database: ${name}`, undefined, logger);
         continue;
       }
 
-      const scoring = calculateStrainScore(data, rank);
+      const scoring = calculateStrainScore({ salesVolumeGrams, orderCount }, rank);
 
       await db
         .insert(strainDailyChallengeStats)
         .values({
           strainId: strain.id,
           statDate: dateString,
-          salesVolumeGrams: data.salesVolumeGrams,
-          orderCount: data.orderCount,
+          salesVolumeGrams,
+          orderCount,
           totalPoints: scoring.totalPoints,
           rank,
           createdAt: new Date(),
@@ -348,8 +350,8 @@ export class DailyChallengeAggregator {
         .onConflictDoUpdate({
           target: [strainDailyChallengeStats.strainId, strainDailyChallengeStats.statDate],
           set: {
-            salesVolumeGrams: data.salesVolumeGrams,
-            orderCount: data.orderCount,
+            salesVolumeGrams,
+            orderCount,
             totalPoints: scoring.totalPoints,
             rank,
             updatedAt: new Date(),
@@ -357,12 +359,16 @@ export class DailyChallengeAggregator {
         });
 
       processed += 1;
-      await this.log(
-        'info',
-        `${name}: ${data.salesVolumeGrams}g, ${scoring.totalPoints} pts (rank #${rank})`,
-        undefined,
-        logger
-      );
+      
+      // Log top 10 strains
+      if (rank <= 10) {
+        await this.log(
+          'info',
+          `${name}: ${salesVolumeGrams}g, ${orderCount} orders, ${scoring.totalPoints} pts (rank #${rank})`,
+          undefined,
+          logger
+        );
+      }
     }
 
     return { processed, skipped };

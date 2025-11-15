@@ -438,6 +438,31 @@ export class MetabaseClient {
       throw error;
     }
   }
+
+  /**
+   * Execute a public Metabase query
+   * @param publicUuid - The public UUID from the public query URL
+   * @returns Array of query results
+   */
+  async executePublicQuery(publicUuid: string): Promise<any[]> {
+    try {
+      console.log(`[Metabase] Executing public query ${publicUuid}...`);
+      
+      const response = await axios.get(`${METABASE_URL}/api/public/card/${publicUuid}/query/json`, {
+        timeout: 60000,
+      });
+
+      const results = response.data || [];
+      console.log(`[Metabase] Public query ${publicUuid} returned ${results.length} rows`);
+      return results;
+    } catch (error) {
+      console.error(`[Metabase] Public query failed:`, error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('[Metabase] Error response:', error.response.data);
+      }
+      throw error;
+    }
+  }
 }
 
 // Singleton instance
