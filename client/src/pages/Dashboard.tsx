@@ -39,43 +39,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen gradient-dark">
-      {/* Hero Header */}
-      <header className="relative overflow-hidden border-b border-border/50">
-        <div className="absolute inset-0 gradient-primary opacity-10 blur-3xl" />
-        <div className="container mx-auto px-4 py-8 relative">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center glow-primary">
-                <Trophy className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gradient-primary">{APP_TITLE}</h1>
-                <p className="text-sm text-muted-foreground mt-1">Fantasy League Dashboard</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-card/50 border border-border/50">
-                <UserCircle className="w-5 h-5 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">
-                  {user?.name || user?.email}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Hero Welcome */}
-          <div className="text-center py-8">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-3">
-              Welcome back, {user?.name?.split(" ")[0] || "Champion"}!
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Track your leagues, manage your lineup, and dominate the competition
-            </p>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Platform Statistics */}

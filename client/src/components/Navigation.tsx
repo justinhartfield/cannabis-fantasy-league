@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link, useLocation } from "wouter";
-import { Home, UserCircle } from "lucide-react";
-import { APP_TITLE } from "@/const";
+import { UserCircle } from "lucide-react";
 
 /**
  * Navigation Component
@@ -26,8 +25,7 @@ export function Navigation() {
           {/* Left side - Home link */}
           <Link href="/">
             <a className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
-              <Home className="w-5 h-5" />
-              <span className="font-semibold hidden sm:inline">{APP_TITLE}</span>
+              <img src="/cfl-logo.png" alt="Cannabis Fantasy League" className="h-8 w-auto" />
             </a>
           </Link>
 
