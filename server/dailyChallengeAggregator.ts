@@ -316,8 +316,8 @@ export class DailyChallengeAggregator {
       const [name, data] = sorted[i];
       const rank = i + 1;
 
-      const strain = await db.query.strains.findFirst({
-        where: (strains, { eq }) => eq(strains.name, name),
+      const strain = await db.query.cannabisStrains.findFirst({
+        where: (cannabisStrains, { eq }) => eq(cannabisStrains.name, name),
       });
 
       if (!strain) {

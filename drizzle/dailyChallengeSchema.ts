@@ -5,7 +5,7 @@
 
 import { pgTable, serial, integer, date, timestamp, index, unique, decimal } from 'drizzle-orm/pg-core';
 import { manufacturers } from './schema';
-import { strains } from './schema';
+import { cannabisStrains } from './schema';
 import { pharmacies } from './schema';
 import { brands } from './schema';
 
@@ -28,7 +28,7 @@ export const manufacturerDailyChallengeStats = pgTable("manufacturerDailyChallen
 
 export const strainDailyChallengeStats = pgTable("strainDailyChallengeStats", {
   id: serial().primaryKey(),
-  strainId: integer().notNull().references(() => strains.id, { onDelete: 'cascade' }),
+  strainId: integer().notNull().references(() => cannabisStrains.id, { onDelete: 'cascade' }),
   statDate: date({ mode: 'string' }).notNull(),
   salesVolumeGrams: integer().default(0).notNull(),
   orderCount: integer().default(0).notNull(),
