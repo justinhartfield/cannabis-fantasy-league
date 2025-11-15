@@ -258,6 +258,69 @@ function parseJsonOrArray(value: string | null | undefined): string[] {
   }
 }
 
+type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+function getDailyChallengeStatDates() {
+  const today = new Date();
+  const todayStatDate = today.toISOString().split("T")[0];
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayStatDate = yesterday.toISOString().split("T")[0];
+  return { todayStatDate, yesterdayStatDate };
+}
+
+async function getDailyChallengePoints(
+  db: Database,
+  {
+    ids,
+    table,
+    idColumn,
+    todayStatDate,
+    yesterdayStatDate,
+  }: {
+    ids: number[];
+    table: any;
+    idColumn: any;
+    todayStatDate: string;
+    yesterdayStatDate: string;
+  }
+) {
+  if (ids.length === 0) {
+    return {
+      todayMap: new Map<number, number | null>(),
+      yesterdayMap: new Map<number, number | null>(),
+    };
+  }
+
+  const fetchForDate = (statDate: string) =>
+    db
+      .select({
+        assetId: idColumn,
+        totalPoints: table.totalPoints,
+      })
+      .from(table)
+      .where(
+        and(
+          inArray(idColumn, ids),
+          eq(table.statDate, statDate)
+        )
+      );
+
+  const [todayRows, yesterdayRows] = await Promise.all([
+    fetchForDate(todayStatDate),
+    fetchForDate(yesterdayStatDate),
+  ]);
+
+  const todayMap = new Map<number, number | null>(
+    todayRows.map((row) => [row.assetId, row.totalPoints])
+  );
+  const yesterdayMap = new Map<number, number | null>(
+    yesterdayRows.map((row) => [row.assetId, row.totalPoints])
+  );
+
+  return { todayMap, yesterdayMap };
+}
+
 /**
  * Draft Router
  * 
@@ -313,10 +376,19 @@ export const draftRouter = router({
       }
 
       if (input.search) {
-        query = query.where(sql`${manufacturers.name} LIKE ${`%${input.search}%`}`) as any;
+        query = query.where(sql`${manufacturers.name} ILIKE ${`%${input.search}%`}`) as any;
       }
 
       const available = await query.limit(input.limit);
+      const { todayStatDate, yesterdayStatDate } = getDailyChallengeStatDates();
+      const manufacturerIds = available.map((mfg) => mfg.id);
+      const { todayMap, yesterdayMap } = await getDailyChallengePoints(db, {
+        ids: manufacturerIds,
+        table: manufacturerDailyChallengeStats,
+        idColumn: manufacturerDailyChallengeStats.manufacturerId,
+        todayStatDate,
+        yesterdayStatDate,
+      });
 
       // Batch fetch daily scores for all manufacturers
       const entityIds = available.map(mfg => mfg.id);
@@ -389,10 +461,19 @@ export const draftRouter = router({
       }
 
       if (input.search) {
-        query = query.where(sql`${cannabisStrains.name} LIKE ${`%${input.search}%`}`) as any;
+        query = query.where(sql`${cannabisStrains.name} ILIKE ${`%${input.search}%`}`) as any;
       }
 
       const available = await query.limit(input.limit);
+      const { todayStatDate, yesterdayStatDate } = getDailyChallengeStatDates();
+      const strainIds = available.map((strain) => strain.id);
+      const { todayMap, yesterdayMap } = await getDailyChallengePoints(db, {
+        ids: strainIds,
+        table: strainDailyChallengeStats,
+        idColumn: strainDailyChallengeStats.strainId,
+        todayStatDate,
+        yesterdayStatDate,
+      });
 
       // Batch fetch daily scores for all cannabis strains
       const entityIds = available.map(s => s.id);
@@ -467,10 +548,19 @@ export const draftRouter = router({
       }
 
       if (input.search) {
-        query = query.where(sql`${strains.name} LIKE ${`%${input.search}%`}`) as any;
+        query = query.where(sql`${strains.name} ILIKE ${`%${input.search}%`}`) as any;
       }
 
       const available = await query.limit(input.limit);
+      const { todayStatDate, yesterdayStatDate } = getDailyChallengeStatDates();
+      const productIds = available.map((product) => product.id);
+      const { todayMap, yesterdayMap } = await getDailyChallengePoints(db, {
+        ids: productIds,
+        table: productDailyChallengeStats,
+        idColumn: productDailyChallengeStats.productId,
+        todayStatDate,
+        yesterdayStatDate,
+      });
 
       // Batch fetch daily scores for all products
       const entityIds = available.map(p => p.id);
@@ -545,10 +635,19 @@ export const draftRouter = router({
       }
 
       if (input.search) {
-        query = query.where(sql`${pharmacies.name} LIKE ${`%${input.search}%`}`) as any;
+        query = query.where(sql`${pharmacies.name} ILIKE ${`%${input.search}%`}`) as any;
       }
 
       const available = await query.limit(input.limit);
+      const { todayStatDate, yesterdayStatDate } = getDailyChallengeStatDates();
+      const pharmacyIds = available.map((phm) => phm.id);
+      const { todayMap, yesterdayMap } = await getDailyChallengePoints(db, {
+        ids: pharmacyIds,
+        table: pharmacyDailyChallengeStats,
+        idColumn: pharmacyDailyChallengeStats.pharmacyId,
+        todayStatDate,
+        yesterdayStatDate,
+      });
 
       // Batch fetch daily scores for all pharmacies
       const entityIds = available.map(p => p.id);
@@ -621,10 +720,19 @@ export const draftRouter = router({
       }
 
       if (input.search) {
-        query = query.where(sql`${brands.name} LIKE ${`%${input.search}%`}`) as any;
+        query = query.where(sql`${brands.name} ILIKE ${`%${input.search}%`}`) as any;
       }
 
       const available = await query.limit(input.limit);
+      const { todayStatDate, yesterdayStatDate } = getDailyChallengeStatDates();
+      const brandIds = available.map((brand) => brand.id);
+      const { todayMap, yesterdayMap } = await getDailyChallengePoints(db, {
+        ids: brandIds,
+        table: brandDailyChallengeStats,
+        idColumn: brandDailyChallengeStats.brandId,
+        todayStatDate,
+        yesterdayStatDate,
+      });
 
       // Batch fetch daily scores for all brands
       const entityIds = available.map(b => b.id);

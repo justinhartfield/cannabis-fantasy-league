@@ -11,6 +11,39 @@ import { DraftAssetCard } from "@/components/DraftAssetCard";
 
 type AssetType = "manufacturer" | "cannabis_strain" | "product" | "pharmacy" | "brand";
 
+type DailyScoreFields = {
+  todayPoints?: number | null;
+  yesterdayPoints?: number | null;
+  todayStatDate?: string | null;
+  yesterdayStatDate?: string | null;
+};
+
+const formatDailyPoints = (points?: number | null) =>
+  points === null || points === undefined ? "—" : `${points} pts`;
+
+const formatStatDateLabel = (label: string, statDate?: string | null) => {
+  if (!statDate) return label;
+  const parsed = new Date(statDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return label;
+  }
+  return `${label} (${parsed.toLocaleDateString()})`;
+};
+
+const buildDailyScoreStats = (entity?: DailyScoreFields) => {
+  if (!entity) return [];
+  return [
+    {
+      label: formatStatDateLabel("Today", entity.todayStatDate),
+      value: formatDailyPoints(entity.todayPoints),
+    },
+    {
+      label: formatStatDateLabel("Yesterday", entity.yesterdayStatDate),
+      value: formatDailyPoints(entity.yesterdayPoints),
+    },
+  ];
+};
+
 interface DraftBoardProps {
   leagueId: number;
   currentPick: number;
@@ -414,8 +447,8 @@ export default function DraftBoard({
                     { label: "Heute", value: `${strain.todayPoints || 0} pts` }
                   ]}
                   isMyTurn={isMyTurn}
-                          isInMyRoster={myRoster.some(r => r.assetType === "cannabis_strain" && r.assetId === strain.id)}
-                          remainingTime={remainingTime}
+                  isInMyRoster={myRoster.some(r => r.assetType === "cannabis_strain" && r.assetId === strain.id)}
+                  remainingTime={remainingTime}
                   onDraft={handleDraft}
                 />
                 ))
@@ -439,8 +472,8 @@ export default function DraftBoard({
                       { label: "Heute", value: `${product.todayPoints || 0} pts` }
                     ]}
                     isMyTurn={isMyTurn}
-                          isInMyRoster={myRoster.some(r => r.assetType === "product" && r.assetId === product.id)}
-                          remainingTime={remainingTime}
+                    isInMyRoster={myRoster.some(r => r.assetType === "product" && r.assetId === product.id)}
+                    remainingTime={remainingTime}
                     onDraft={handleDraft}
                   />
                 ))
@@ -464,8 +497,8 @@ export default function DraftBoard({
                       { label: "Heute", value: `${phm.todayPoints || 0} pts` }
                     ]}
                     isMyTurn={isMyTurn}
-                          isInMyRoster={myRoster.some(r => r.assetType === "pharmacy" && r.assetId === phm.id)}
-                          remainingTime={remainingTime}
+                    isInMyRoster={myRoster.some(r => r.assetType === "pharmacy" && r.assetId === phm.id)}
+                    remainingTime={remainingTime}
                     onDraft={handleDraft}
                   />
                 ))
