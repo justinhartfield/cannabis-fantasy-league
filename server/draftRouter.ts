@@ -18,9 +18,69 @@ import {
   pharmacyWeeklyStats,
   brandWeeklyStats,
 } from "../drizzle/schema";
+import {
+  manufacturerDailyChallengeStats,
+  strainDailyChallengeStats,
+  productDailyChallengeStats,
+  pharmacyDailyChallengeStats,
+  brandDailyChallengeStats,
+} from "../drizzle/dailyChallengeSchema";
 import { wsManager } from "./websocket";
 import { validateDraftPick, advanceDraftPick, calculateNextPick, getDraftStatus, checkAndCompleteDraft } from "./draftLogic";
 import { draftTimerManager } from "./draftTimer";
+
+/**
+ * Helper function to get yesterday's and today's dates in YYYY-MM-DD format
+ */
+function getDraftDates() {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  return {
+    yesterday: formatDate(yesterday),
+    today: formatDate(today),
+  };
+}
+
+/**
+ * Helper function to fetch daily challenge scores for an entity
+ */
+async function getDailyScores(
+  db: any,
+  table: any,
+  idField: string,
+  entityId: number
+): Promise<{ yesterday: number; today: number }> {
+  const dates = getDraftDates();
+  
+  const [yesterdayStats, todayStats] = await Promise.all([
+    db.select().from(table).where(
+      and(
+        eq(table[idField], entityId),
+        eq(table.statDate, dates.yesterday)
+      )
+    ).limit(1),
+    db.select().from(table).where(
+      and(
+        eq(table[idField], entityId),
+        eq(table.statDate, dates.today)
+      )
+    ).limit(1),
+  ]);
+  
+  return {
+    yesterday: yesterdayStats[0]?.totalPoints || 0,
+    today: todayStats[0]?.totalPoints || 0,
+  };
+}
 
 /**
  * Helper function to parse JSON or comma-separated string into array
@@ -107,12 +167,27 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      return available.map((mfg) => ({
-        id: mfg.id,
-        name: mfg.name,
-        productCount: mfg.productCount || 0,
-        // TODO: Add more stats
-      }));
+      // Fetch daily scores for each manufacturer
+      const withScores = await Promise.all(
+        available.map(async (mfg) => {
+          const dailyScores = await getDailyScores(
+            db,
+            manufacturerDailyChallengeStats,
+            'manufacturerId',
+            mfg.id
+          );
+          return {
+            id: mfg.id,
+            name: mfg.name,
+            logoUrl: mfg.logoUrl,
+            productCount: mfg.productCount || 0,
+            yesterdayPoints: dailyScores.yesterday,
+            todayPoints: dailyScores.today,
+          };
+        })
+      );
+
+      return withScores;
     }),
 
   /**
@@ -166,14 +241,29 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      return available.map((strain) => ({
-        id: strain.id,
-        name: strain.name,
-        type: strain.type || "Unknown",
-        effects: parseJsonOrArray(strain.effects),
-        flavors: parseJsonOrArray(strain.flavors),
-        // TODO: Add more stats
-      }));
+      // Fetch daily scores for each cannabis strain
+      const withScores = await Promise.all(
+        available.map(async (strain) => {
+          const dailyScores = await getDailyScores(
+            db,
+            strainDailyChallengeStats,
+            'strainId',
+            strain.id
+          );
+          return {
+            id: strain.id,
+            name: strain.name,
+            type: strain.type || "Unknown",
+            effects: parseJsonOrArray(strain.effects),
+            flavors: parseJsonOrArray(strain.flavors),
+            imageUrl: strain.imageUrl,
+            yesterdayPoints: dailyScores.yesterday,
+            todayPoints: dailyScores.today,
+          };
+        })
+      );
+
+      return withScores;
     }),
 
   /**
@@ -227,15 +317,29 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      return available.map((product) => ({
-        id: product.id,
-        name: product.name,
-        manufacturer: product.manufacturer || "Unknown",
-        thcContent: product.thcContent || 0,
-        cbdContent: product.cbdContent || 0,
-        favoriteCount: product.favoriteCount || 0,
-        // TODO: Add more stats
-      }));
+      // Fetch daily scores for each product
+      const withScores = await Promise.all(
+        available.map(async (product) => {
+          const dailyScores = await getDailyScores(
+            db,
+            productDailyChallengeStats,
+            'productId',
+            product.id
+          );
+          return {
+            id: product.id,
+            name: product.name,
+            manufacturer: product.manufacturer || "Unknown",
+            thcContent: product.thcContent || 0,
+            cbdContent: product.cbdContent || 0,
+            favoriteCount: product.favoriteCount || 0,
+            yesterdayPoints: dailyScores.yesterday,
+            todayPoints: dailyScores.today,
+          };
+        })
+      );
+
+      return withScores;
     }),
 
   /**
@@ -289,12 +393,26 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      return available.map((phm) => ({
-        id: phm.id,
-        name: phm.name,
-        city: phm.city || "Unknown",
-        // TODO: Add more stats
-      }));
+      // Fetch daily scores for each pharmacy
+      const withScores = await Promise.all(
+        available.map(async (phm) => {
+          const dailyScores = await getDailyScores(
+            db,
+            pharmacyDailyChallengeStats,
+            'pharmacyId',
+            phm.id
+          );
+          return {
+            id: phm.id,
+            name: phm.name,
+            city: phm.city || "Unknown",
+            yesterdayPoints: dailyScores.yesterday,
+            todayPoints: dailyScores.today,
+          };
+        })
+      );
+
+      return withScores;
     }),
 
   /**
@@ -348,13 +466,27 @@ export const draftRouter = router({
 
       const available = await query.limit(input.limit);
 
-      return available.map((brand) => ({
-        id: brand.id,
-        name: brand.name,
-        totalFavorites: brand.totalFavorites || 0,
-        totalViews: brand.totalViews || 0,
-        // TODO: Add more stats
-      }));
+      // Fetch daily scores for each brand
+      const withScores = await Promise.all(
+        available.map(async (brand) => {
+          const dailyScores = await getDailyScores(
+            db,
+            brandDailyChallengeStats,
+            'brandId',
+            brand.id
+          );
+          return {
+            id: brand.id,
+            name: brand.name,
+            totalFavorites: brand.totalFavorites || 0,
+            totalViews: brand.totalViews || 0,
+            yesterdayPoints: dailyScores.yesterday,
+            todayPoints: dailyScores.today,
+          };
+        })
+      );
+
+      return withScores;
     }),
 
   /**

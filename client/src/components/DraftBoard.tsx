@@ -249,7 +249,10 @@ export default function DraftBoard({
                           assetId={mfg.id}
                           assetName={mfg.name}
                           imageUrl={mfg.logoUrl}
-                          stats={[{ label: "Produkte", value: mfg.productCount }]}
+                          stats={[
+                            { label: "Gestern", value: `${mfg.yesterdayPoints || 0} pts` },
+                            { label: "Heute", value: `${mfg.todayPoints || 0} pts` }
+                          ]}
                           isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "manufacturer" && r.assetId === mfg.id)}
                           remainingTime={remainingTime}
@@ -273,8 +276,8 @@ export default function DraftBoard({
                           assetName={strain.name}
                           imageUrl={strain.imageUrl}
                           stats={[
-                            { label: "Typ", value: strain.type },
-                            { label: "Effects", value: Array.isArray(strain.effects) ? strain.effects.slice(0, 2).join(", ") : (strain.effects || "N/A") },
+                            { label: "Gestern", value: `${strain.yesterdayPoints || 0} pts` },
+                            { label: "Heute", value: `${strain.todayPoints || 0} pts` }
                           ]}
                           isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "cannabis_strain" && r.assetId === strain.id)}
@@ -298,9 +301,8 @@ export default function DraftBoard({
                           assetId={product.id}
                           assetName={product.name}
                           stats={[
-                            { label: "Hersteller", value: product.manufacturer },
-                            { label: "THC", value: `${product.thcContent}%` },
-                            { label: "Favorites", value: product.favoriteCount },
+                            { label: "Gestern", value: `${product.yesterdayPoints || 0} pts` },
+                            { label: "Heute", value: `${product.todayPoints || 0} pts` }
                           ]}
                           isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "product" && r.assetId === product.id)}
@@ -325,8 +327,8 @@ export default function DraftBoard({
                           assetName={brand.name}
                           imageUrl={brand.logoUrl}
                           stats={[
-                            { label: "Favorites", value: brand.totalFavorites || 0 },
-                            { label: "Views", value: brand.totalViews || 0 },
+                            { label: "Gestern", value: `${brand.yesterdayPoints || 0} pts` },
+                            { label: "Heute", value: `${brand.todayPoints || 0} pts` }
                           ]}
                           isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "brand" && r.assetId === brand.id)}
@@ -350,7 +352,10 @@ export default function DraftBoard({
                           assetId={phm.id}
                           assetName={phm.name}
                           imageUrl={phm.logoUrl}
-                          stats={[{ label: "Stadt", value: phm.city }]}
+                          stats={[
+                            { label: "Gestern", value: `${phm.yesterdayPoints || 0} pts` },
+                            { label: "Heute", value: `${phm.todayPoints || 0} pts` }
+                          ]}
                           isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "pharmacy" && r.assetId === phm.id)}
                           remainingTime={remainingTime}
@@ -381,7 +386,10 @@ export default function DraftBoard({
                     assetType="manufacturer"
                     assetId={mfg.id}
                     assetName={mfg.name}
-                    stats={[{ label: "Produkte", value: mfg.productCount }]}
+                    stats={[
+                      { label: "Gestern", value: `${mfg.yesterdayPoints || 0} pts` },
+                      { label: "Heute", value: `${mfg.todayPoints || 0} pts` }
+                    ]}
                     isMyTurn={isMyTurn}
                     onDraft={handleDraft}
                   />
@@ -402,8 +410,8 @@ export default function DraftBoard({
                   assetId={strain.id}
                   assetName={strain.name}
                   stats={[
-                    { label: "Typ", value: strain.type },
-                    { label: "Effects", value: Array.isArray(strain.effects) ? strain.effects.slice(0, 2).join(", ") : (strain.effects || "N/A") },
+                    { label: "Gestern", value: `${strain.yesterdayPoints || 0} pts` },
+                    { label: "Heute", value: `${strain.todayPoints || 0} pts` }
                   ]}
                   isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "cannabis_strain" && r.assetId === strain.id)}
@@ -427,9 +435,8 @@ export default function DraftBoard({
                     assetId={product.id}
                     assetName={product.name}
                     stats={[
-                      { label: "Hersteller", value: product.manufacturer },
-                      { label: "THC", value: `${product.thcContent}%` },
-                      { label: "Favorites", value: product.favoriteCount },
+                      { label: "Gestern", value: `${product.yesterdayPoints || 0} pts` },
+                      { label: "Heute", value: `${product.todayPoints || 0} pts` }
                     ]}
                     isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "product" && r.assetId === product.id)}
@@ -452,7 +459,10 @@ export default function DraftBoard({
                     assetType="pharmacy"
                     assetId={phm.id}
                     assetName={phm.name}
-                    stats={[{ label: "Stadt", value: phm.city }]}
+                    stats={[
+                      { label: "Gestern", value: `${phm.yesterdayPoints || 0} pts` },
+                      { label: "Heute", value: `${phm.todayPoints || 0} pts` }
+                    ]}
                     isMyTurn={isMyTurn}
                           isInMyRoster={myRoster.some(r => r.assetType === "pharmacy" && r.assetId === phm.id)}
                           remainingTime={remainingTime}
@@ -475,8 +485,8 @@ export default function DraftBoard({
                     assetId={brand.id}
                     assetName={brand.name}
                     stats={[
-                      { label: "Favorites", value: brand.totalFavorites || 0 },
-                      { label: "Views", value: brand.totalViews || 0 },
+                      { label: "Gestern", value: `${brand.yesterdayPoints || 0} pts` },
+                      { label: "Heute", value: `${brand.todayPoints || 0} pts` }
                     ]}
                     isMyTurn={isMyTurn}
                     isInMyRoster={myRoster.some(r => r.assetType === "brand" && r.assetId === brand.id)}
