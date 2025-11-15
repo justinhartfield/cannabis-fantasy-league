@@ -6,6 +6,7 @@
 import { pgTable, serial, integer, date, timestamp, index, unique, decimal } from 'drizzle-orm/pg-core';
 import { manufacturers } from './schema';
 import { cannabisStrains } from './schema';
+import { strains } from './schema';
 import { pharmacies } from './schema';
 import { brands } from './schema';
 
@@ -40,6 +41,22 @@ export const strainDailyChallengeStats = pgTable("strainDailyChallengeStats", {
   unique("strain_daily_challenge_unique").on(table.strainId, table.statDate),
   index("strain_daily_challenge_date_idx").on(table.statDate),
   index("strain_daily_challenge_rank_idx").on(table.statDate, table.rank),
+]);
+
+export const productDailyChallengeStats = pgTable("productDailyChallengeStats", {
+  id: serial().primaryKey(),
+  productId: integer().notNull().references(() => strains.id, { onDelete: 'cascade' }),
+  statDate: date({ mode: 'string' }).notNull(),
+  salesVolumeGrams: integer().default(0).notNull(),
+  orderCount: integer().default(0).notNull(),
+  totalPoints: integer().default(0).notNull(),
+  rank: integer().default(0),
+  createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("product_daily_challenge_unique").on(table.productId, table.statDate),
+  index("product_daily_challenge_date_idx").on(table.statDate),
+  index("product_daily_challenge_rank_idx").on(table.statDate, table.rank),
 ]);
 
 export const pharmacyDailyChallengeStats = pgTable("pharmacyDailyChallengeStats", {

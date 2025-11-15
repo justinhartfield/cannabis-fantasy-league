@@ -15,6 +15,7 @@ import {
 import {
   manufacturerDailyChallengeStats,
   strainDailyChallengeStats,
+  productDailyChallengeStats,
   pharmacyDailyChallengeStats,
   brandDailyChallengeStats,
 } from '../drizzle/dailyChallengeSchema';
@@ -413,9 +414,9 @@ export class DailyChallengeAggregator {
       const scoring = calculateStrainScore(data, rank);
 
       await db
-        .insert(strainDailyChallengeStats)
+        .insert(productDailyChallengeStats)
         .values({
-          strainId: product.id,
+          productId: product.id,
           statDate: dateString,
           salesVolumeGrams: data.salesVolumeGrams,
           orderCount: data.orderCount,
@@ -425,7 +426,7 @@ export class DailyChallengeAggregator {
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
-          target: [strainDailyChallengeStats.strainId, strainDailyChallengeStats.statDate],
+          target: [productDailyChallengeStats.productId, productDailyChallengeStats.statDate],
           set: {
             salesVolumeGrams: data.salesVolumeGrams,
             orderCount: data.orderCount,

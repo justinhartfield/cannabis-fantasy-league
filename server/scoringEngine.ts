@@ -33,6 +33,7 @@ import {
 import {
   manufacturerDailyChallengeStats,
   strainDailyChallengeStats,
+  productDailyChallengeStats,
   pharmacyDailyChallengeStats,
   brandDailyChallengeStats,
 } from '../drizzle/dailyChallengeSchema';
@@ -120,6 +121,7 @@ function finalizeDailyBreakdown(
 
 type ManufacturerDailyStat = typeof manufacturerDailyChallengeStats.$inferSelect;
 type StrainDailyStat = typeof strainDailyChallengeStats.$inferSelect;
+type ProductDailyStat = typeof productDailyChallengeStats.$inferSelect;
 type PharmacyDailyStat = typeof pharmacyDailyChallengeStats.$inferSelect;
 type BrandDailyStat = typeof brandDailyChallengeStats.$inferSelect;
 
@@ -1453,10 +1455,10 @@ async function scoreProduct(productId: number, scope: ScoreScope): Promise<{ poi
         .limit(1)
     : await db
         .select()
-        .from(strainDailyChallengeStats)
+        .from(productDailyChallengeStats)
         .where(and(
-          eq(strainDailyChallengeStats.strainId, productId),
-          eq(strainDailyChallengeStats.statDate, scope.statDate)
+          eq(productDailyChallengeStats.productId, productId),
+          eq(productDailyChallengeStats.statDate, scope.statDate)
         ))
         .limit(1);
 
@@ -1480,7 +1482,7 @@ async function scoreProduct(productId: number, scope: ScoreScope): Promise<{ poi
     });
   }
 
-  const dailyStat = statRecord as StrainDailyStat;
+  const dailyStat = statRecord as ProductDailyStat;
   return buildStrainDailyBreakdown(dailyStat);
 }
 
