@@ -1338,16 +1338,8 @@ async function scoreManufacturer(manufacturerId: number, scope: ScoreScope): Pro
     });
   }
 
-  // For daily challenges, return pre-calculated points
-  return {
-    points: statRecord.totalPoints,
-    breakdown: {
-      salesVolumeGrams: statRecord.salesVolumeGrams,
-      orderCount: statRecord.orderCount,
-      revenueCents: statRecord.revenueCents,
-      rank: statRecord.rank,
-    }
-  };
+  // For daily challenges, build detailed breakdown
+  return buildManufacturerDailyBreakdown(statRecord as ManufacturerDailyStat);
 }
 
 /**
@@ -1428,15 +1420,8 @@ async function scoreCannabisStrain(cannabisStrainId: number, scope: ScoreScope):
   }
 
   // For daily challenges, return pre-calculated points
-  const dailyStat = statRecord as typeof strainDailyChallengeStats.$inferSelect;
-  return {
-    points: dailyStat.totalPoints,
-    breakdown: {
-      salesVolumeGrams: dailyStat.salesVolumeGrams,
-      orderCount: dailyStat.orderCount,
-      rank: dailyStat.rank,
-    }
-  };
+  const dailyStat = statRecord as StrainDailyStat;
+  return buildStrainDailyBreakdown(dailyStat);
 }
 
 /**
@@ -1487,16 +1472,8 @@ async function scoreProduct(productId: number, scope: ScoreScope): Promise<{ poi
     });
   }
 
-  const dailyStat = statRecord as typeof strainDailyChallengeStats.$inferSelect;
-
-  return {
-    points: dailyStat.totalPoints,
-    breakdown: {
-      salesVolumeGrams: dailyStat.salesVolumeGrams,
-      orderCount: dailyStat.orderCount,
-      rank: dailyStat.rank,
-    },
-  };
+  const dailyStat = statRecord as StrainDailyStat;
+  return buildStrainDailyBreakdown(dailyStat);
 }
 
 /**
@@ -1548,16 +1525,9 @@ async function scorePharmacy(pharmacyId: number, scope: ScoreScope): Promise<{ p
     });
   }
 
-  // For daily challenges, return pre-calculated points
-  const dailyStat = statRecord as typeof pharmacyDailyChallengeStats.$inferSelect;
-  return {
-    points: dailyStat.totalPoints,
-    breakdown: {
-      orderCount: dailyStat.orderCount,
-      revenueCents: dailyStat.revenueCents,
-      rank: dailyStat.rank,
-    }
-  };
+  // For daily challenges, build detailed breakdown
+  const dailyStat = statRecord as PharmacyDailyStat;
+  return buildPharmacyDailyBreakdown(dailyStat);
 }
 
 /**
@@ -1612,15 +1582,7 @@ async function scoreBrand(brandId: number, scope: ScoreScope): Promise<{ points:
     });
   }
 
-  // For daily challenges, return pre-calculated points based on ratings
-  const dailyStat = statRecord as typeof brandDailyChallengeStats.$inferSelect;
-  return {
-    points: dailyStat.totalPoints,
-    breakdown: {
-      totalRatings: dailyStat.totalRatings,
-      averageRating: dailyStat.averageRating,
-      bayesianAverage: dailyStat.bayesianAverage,
-      rank: dailyStat.rank,
-    }
-  };
+  // For daily challenges, return detailed ratings-based breakdown
+  const dailyStat = statRecord as BrandDailyStat;
+  return buildBrandDailyBreakdown(dailyStat);
 }
