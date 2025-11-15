@@ -5,7 +5,16 @@
  */
 
 import { router, protectedProcedure } from './_core/trpc';
-import { calculateWeeklyScores, calculateTeamScore, calculateDailyChallengeScores } from './scoringEngine';
+import {
+  calculateWeeklyScores,
+  calculateTeamScore,
+  calculateDailyChallengeScores,
+  buildManufacturerDailyBreakdown,
+  buildStrainDailyBreakdown,
+  buildPharmacyDailyBreakdown,
+  buildBrandDailyBreakdown,
+  type BreakdownDetail,
+} from './scoringEngine';
 import { z } from 'zod';
 import { getDb } from './db';
 import { 
@@ -652,6 +661,7 @@ export const scoringRouter = router({
         const enrichedBreakdowns = breakdowns.map((bd) => ({
           ...bd,
           assetName: nameMap.get(bd.assetId) || null,
+          breakdown: normalizeDailyBreakdownPayload(bd),
         }));
 
         return {
@@ -680,3 +690,89 @@ export const scoringRouter = router({
       }
     }),
 });
+
+type DailyBreakdownRow = typeof dailyScoringBreakdowns.$inferSelect;
+
+function normalizeDailyBreakdownPayload(bd: DailyBreakdownRow): BreakdownDetail {
+  const current = (bd.breakdown ?? null) as BreakdownDetail | Record<string, any> | null;
+  if (current && Array.isArray((current as any).components)) {
+    return current as BreakdownDetail;
+  }
+
+  const raw = (current ?? {}) as Record<string, any>;
+  const totalPoints = bd.totalPoints ?? 0;
+
+  if (bd.assetType === 'manufacturer') {
+    return buildManufacturerDailyBreakdown({
+      salesVolumeGrams: Number(raw.salesVolumeGrams ?? 0),
+      orderCount: Number(raw.orderCount ?? 0),
+      revenueCents: Number(raw.revenueCents ?? 0),
+      rank: raw.rank ?? 0,
+      totalPoints,
+    }).breakdown;
+  }
+
+  if (bd.assetType === 'cannabis_strain' || bd.assetType === 'product') {
+    return buildStrainDailyBreakdown({
+      salesVolumeGrams: Number(raw.salesVolumeGrams ?? 0),
+      orderCount: Number(raw.orderCount ?? 0),
+      rank: raw.rank ?? 0,
+      totalPoints,
+    }).breakdown;
+  }
+
+  if (bd.assetType === 'pharmacy') {
+    return buildPharmacyDailyBreakdown({
+      orderCount: Number(raw.orderCount ?? 0),
+      revenueCents: Number(raw.revenueCents ?? 0),
+      rank: raw.rank ?? 0,
+      totalPoints,
+    }).breakdown;
+  }
+
+  if (bd.assetType === 'brand') {
+    return buildBrandDailyBreakdown({
+      totalRatings: Number(raw.totalRatings ?? 0),
+      averageRating: raw.averageRating?.toString() ?? '0',
+      bayesianAverage: raw.bayesianAverage?.toString() ?? '0',
+      veryGoodCount: Number(raw.veryGoodCount ?? 0),
+      goodCount: Number(raw.goodCount ?? 0),
+      acceptableCount: Number(raw.acceptableCount ?? 0),
+      badCount: Number(raw.badCount ?? 0),
+      veryBadCount: Number(raw.veryBadCount ?? 0),
+      rank: raw.rank ?? 0,
+      totalPoints,
+    }).breakdown;
+  }
+
+  return createNoDataBreakdown(totalPoints);
+}
+
+function createNoDataBreakdown(totalPoints: number): BreakdownDetail {
+  const detail: BreakdownDetail = {
+    components: [
+      {
+        category: 'No Data',
+        value: 0,
+        formula: 'No stats available',
+        points: 0,
+      },
+    ],
+    bonuses: [],
+    penalties: [],
+    subtotal: 0,
+    total: totalPoints,
+  };
+
+  if (totalPoints !== 0) {
+    detail.components.push({
+      category: 'Score Sync Adjustment',
+      value: totalPoints,
+      formula: 'Align with stored score',
+      points: totalPoints,
+    });
+    detail.subtotal = totalPoints;
+  }
+
+  return detail;
+}

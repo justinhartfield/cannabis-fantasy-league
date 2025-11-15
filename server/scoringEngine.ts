@@ -47,20 +47,20 @@ import {
   calculateBrandScore as calculateDailyBrandScore,
 } from './dailyChallengeScoringEngine';
 
-type BreakdownComponent = {
+export type BreakdownComponent = {
   category: string;
   value: number | string;
   formula: string;
   points: number;
 };
 
-type BreakdownBonus = {
+export type BreakdownBonus = {
   type: string;
   condition: string;
   points: number;
 };
 
-type BreakdownDetail = {
+export type BreakdownDetail = {
   components: BreakdownComponent[];
   bonuses: BreakdownBonus[];
   penalties: BreakdownBonus[];
@@ -68,7 +68,7 @@ type BreakdownDetail = {
   total: number;
 };
 
-type BreakdownResult = {
+export type BreakdownResult = {
   points: number;
   breakdown: BreakdownDetail;
 };
@@ -123,7 +123,12 @@ type StrainDailyStat = typeof strainDailyChallengeStats.$inferSelect;
 type PharmacyDailyStat = typeof pharmacyDailyChallengeStats.$inferSelect;
 type BrandDailyStat = typeof brandDailyChallengeStats.$inferSelect;
 
-function buildManufacturerDailyBreakdown(statRecord: ManufacturerDailyStat): BreakdownResult {
+type ManufacturerDailySource = Pick<ManufacturerDailyStat, 'salesVolumeGrams' | 'orderCount' | 'revenueCents' | 'rank' | 'totalPoints'>;
+type StrainDailySource = Pick<StrainDailyStat, 'salesVolumeGrams' | 'orderCount' | 'rank' | 'totalPoints'>;
+type PharmacyDailySource = Pick<PharmacyDailyStat, 'orderCount' | 'revenueCents' | 'rank' | 'totalPoints'>;
+type BrandDailySource = Pick<BrandDailyStat, 'totalRatings' | 'averageRating' | 'bayesianAverage' | 'veryGoodCount' | 'goodCount' | 'acceptableCount' | 'badCount' | 'veryBadCount' | 'rank' | 'totalPoints'>;
+
+export function buildManufacturerDailyBreakdown(statRecord: ManufacturerDailySource): BreakdownResult {
   const salesVolumeGrams = statRecord.salesVolumeGrams ?? 0;
   const orderCount = statRecord.orderCount ?? 0;
   const revenueCents = statRecord.revenueCents ?? 0;
@@ -171,7 +176,7 @@ function buildManufacturerDailyBreakdown(statRecord: ManufacturerDailyStat): Bre
   return finalizeDailyBreakdown(components, bonuses, [], statRecord.totalPoints, scoreParts.totalPoints);
 }
 
-function buildStrainDailyBreakdown(statRecord: StrainDailyStat): BreakdownResult {
+export function buildStrainDailyBreakdown(statRecord: StrainDailySource): BreakdownResult {
   const salesVolumeGrams = statRecord.salesVolumeGrams ?? 0;
   const orderCount = statRecord.orderCount ?? 0;
   const rank = statRecord.rank ?? 0;
@@ -211,7 +216,7 @@ function buildStrainDailyBreakdown(statRecord: StrainDailyStat): BreakdownResult
   return finalizeDailyBreakdown(components, bonuses, [], statRecord.totalPoints, scoreParts.totalPoints);
 }
 
-function buildPharmacyDailyBreakdown(statRecord: PharmacyDailyStat): BreakdownResult {
+export function buildPharmacyDailyBreakdown(statRecord: PharmacyDailySource): BreakdownResult {
   const orderCount = statRecord.orderCount ?? 0;
   const revenueCents = statRecord.revenueCents ?? 0;
   const rank = statRecord.rank ?? 0;
@@ -251,7 +256,7 @@ function buildPharmacyDailyBreakdown(statRecord: PharmacyDailyStat): BreakdownRe
   return finalizeDailyBreakdown(components, bonuses, [], statRecord.totalPoints, scoreParts.totalPoints);
 }
 
-function buildBrandDailyBreakdown(statRecord: BrandDailyStat): BreakdownResult {
+export function buildBrandDailyBreakdown(statRecord: BrandDailySource): BreakdownResult {
   const totalRatings = statRecord.totalRatings ?? 0;
   const averageRating = Number(statRecord.averageRating ?? 0);
   const bayesianAverage = Number(statRecord.bayesianAverage ?? 0);
@@ -751,12 +756,13 @@ export function calculateTeamBonuses(
   positionPoints: {
     mfg1: number;
     mfg2: number;
-    str1: number;
-    str2: number;
-    str3: number;
-    str4: number;
+    cstr1: number;
+    cstr2: number;
+    prd1: number;
+    prd2: number;
     phm1: number;
     phm2: number;
+    brd1: number;
     flex: number;
   }
 ): { bonuses: any[]; totalBonus: number } {
@@ -788,21 +794,23 @@ export function calculateTeamBonuses(
   }
 
   // Balanced Attack: +20 pts if all asset types contribute >25%
-  const mfgTotal = positionPoints.mfg1 + positionPoints.mfg2;
-  const strTotal = positionPoints.str1 + positionPoints.str2 + positionPoints.str3 + positionPoints.str4;
-  const phmTotal = positionPoints.phm1 + positionPoints.phm2;
-  
-  const mfgPercent = (mfgTotal / totalPoints) * 100;
-  const strPercent = (strTotal / totalPoints) * 100;
-  const phmPercent = (phmTotal / totalPoints) * 100;
+  if (totalPoints > 0) {
+    const mfgTotal = positionPoints.mfg1 + positionPoints.mfg2;
+    const cultivarTotal = positionPoints.cstr1 + positionPoints.cstr2 + positionPoints.prd1 + positionPoints.prd2;
+    const retailTotal = positionPoints.phm1 + positionPoints.phm2 + positionPoints.brd1;
 
-  if (mfgPercent > 25 && strPercent > 25 && phmPercent > 25) {
-    bonuses.push({
-      type: 'Balanced Attack',
-      condition: 'All asset types >25% of total',
-      points: 20,
-    });
-    totalBonus += 20;
+    const mfgPercent = (mfgTotal / totalPoints) * 100;
+    const cultivarPercent = (cultivarTotal / totalPoints) * 100;
+    const retailPercent = (retailTotal / totalPoints) * 100;
+
+    if (mfgPercent > 25 && cultivarPercent > 25 && retailPercent > 25) {
+      bonuses.push({
+        type: 'Balanced Attack',
+        condition: 'Manufacturers, cultivars, and retail each >25%',
+        points: 20,
+      });
+      totalBonus += 20;
+    }
   }
 
   return { bonuses, totalBonus };
@@ -1174,7 +1182,6 @@ async function persistTeamScore(db: Awaited<ReturnType<typeof getDb>>, params: P
           bonusPoints: params.totalBonus,
           penaltyPoints: 0,
           totalPoints: params.totalPoints,
-          updatedAt: new Date().toISOString(),
         })
         .where(and(
           eq(weeklyTeamScores.teamId, params.persistence.teamId),
@@ -1329,12 +1336,13 @@ async function scoreManufacturer(manufacturerId: number, scope: ScoreScope): Pro
 
   // For weekly scoring, calculate points using formula
   if (scope.type === 'weekly') {
+    const weeklyStat = statRecord as typeof manufacturerWeeklyStats.$inferSelect;
     return calculateManufacturerPoints({
-      salesVolumeGrams: statRecord.salesVolumeGrams,
-      growthRatePercent: statRecord.growthRatePercent,
-      marketShareRank: statRecord.marketShareRank,
-      rankChange: statRecord.rankChange,
-      productCount: statRecord.productCount,
+      salesVolumeGrams: weeklyStat.salesVolumeGrams,
+      growthRatePercent: weeklyStat.growthRatePercent,
+      marketShareRank: weeklyStat.marketShareRank,
+      rankChange: weeklyStat.rankChange,
+      productCount: weeklyStat.productCount,
     });
   }
 
