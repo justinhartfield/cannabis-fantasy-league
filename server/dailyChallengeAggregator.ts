@@ -51,6 +51,7 @@ export type DailyChallengeAggregationSummary = {
   totalOrders: number;
   manufacturers: EntityAggregationSummary;
   strains: EntityAggregationSummary;
+  products: EntityAggregationSummary;
   pharmacies: EntityAggregationSummary;
   brands: EntityAggregationSummary;
 };
@@ -112,6 +113,7 @@ export class DailyChallengeAggregator {
         totalOrders: orders.length,
         manufacturers: { processed: 0, skipped: 0 },
         strains: { processed: 0, skipped: 0 },
+        products: { processed: 0, skipped: 0 },
         pharmacies: { processed: 0, skipped: 0 },
         brands: { processed: 0, skipped: 0 },
       };
@@ -121,15 +123,17 @@ export class DailyChallengeAggregator {
         return summary;
       }
 
-      const [manufacturerResult, strainResult, pharmacyResult, brandResult] = await Promise.all([
+      const [manufacturerResult, strainResult, productResult, pharmacyResult, brandResult] = await Promise.all([
         this.aggregateManufacturers(db, dateString, orders, logger),
         this.aggregateStrains(db, dateString, orders, logger),
+        this.aggregateProducts(db, dateString, orders, logger),
         this.aggregatePharmacies(db, dateString, orders, logger),
         this.aggregateBrands(db, dateString, orders, logger),
       ]);
 
       summary.manufacturers = manufacturerResult;
       summary.strains = strainResult;
+      summary.products = productResult;
       summary.pharmacies = pharmacyResult;
       summary.brands = brandResult;
 
@@ -332,6 +336,86 @@ export class DailyChallengeAggregator {
         .insert(strainDailyChallengeStats)
         .values({
           strainId: strain.id,
+          statDate: dateString,
+          salesVolumeGrams: data.salesVolumeGrams,
+          orderCount: data.orderCount,
+          totalPoints: scoring.totalPoints,
+          rank,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [strainDailyChallengeStats.strainId, strainDailyChallengeStats.statDate],
+          set: {
+            salesVolumeGrams: data.salesVolumeGrams,
+            orderCount: data.orderCount,
+            totalPoints: scoring.totalPoints,
+            rank,
+            updatedAt: new Date(),
+          },
+        });
+
+      processed += 1;
+      await this.log(
+        'info',
+        `${name}: ${data.salesVolumeGrams}g, ${scoring.totalPoints} pts (rank #${rank})`,
+        undefined,
+        logger
+      );
+    }
+
+    return { processed, skipped };
+  }
+  /**
+   * Aggregate product (pharmaceutical product) stats and calculate scores
+   */
+  private async aggregateProducts(
+    db: Database,
+    dateString: string,
+    orders: OrderRecord[],
+    logger?: AggregationLogger
+  ): Promise<EntityAggregationSummary> {
+    await this.log('info', 'Aggregating products...', undefined, logger);
+
+    const stats = new Map<string, { salesVolumeGrams: number; orderCount: number }>();
+
+    for (const order of orders) {
+      const name = order.ProductName;
+      if (!name) continue;
+
+      const quantity = order.Quantity || 0;
+
+      const current = stats.get(name) || { salesVolumeGrams: 0, orderCount: 0 };
+      current.salesVolumeGrams += quantity;
+      current.orderCount += 1;
+      stats.set(name, current);
+    }
+
+    const sorted = Array.from(stats.entries()).sort((a, b) => b[1].salesVolumeGrams - a[1].salesVolumeGrams);
+
+    let processed = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < sorted.length; i++) {
+      const [name, data] = sorted[i];
+      const rank = i + 1;
+
+      const product = await db.query.strains.findFirst({
+        where: (strains, { eq }) => eq(strains.name, name),
+      });
+
+      if (!product) {
+        skipped += 1;
+        await this.log('warn', `Product not found: ${name}`, undefined, logger);
+        continue;
+      }
+
+      const scoring = calculateStrainScore(data, rank);
+
+      await db
+        .insert(strainDailyChallengeStats)
+        .values({
+          strainId: product.id,
           statDate: dateString,
           salesVolumeGrams: data.salesVolumeGrams,
           orderCount: data.orderCount,
