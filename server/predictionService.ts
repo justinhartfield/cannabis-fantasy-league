@@ -101,12 +101,27 @@ async function generateManufacturerMatchups(count: number): Promise<MatchupPair[
     .orderBy(desc(manufacturerDailyStats.totalPoints))
     .limit(20);
 
+  // Fallback: if not enough manufacturers with stats, select random ones
+  let entitiesToUse = topManufacturers;
   if (topManufacturers.length < count * 2) {
-    console.warn('[PredictionService] Not enough manufacturers for matchups');
-    return [];
+    console.warn('[PredictionService] Not enough manufacturers with stats, using random selection');
+    const allManufacturers = await db
+      .select({
+        id: manufacturers.id,
+        name: manufacturers.name,
+      })
+      .from(manufacturers)
+      .limit(100);
+    
+    if (allManufacturers.length < count * 2) {
+      console.warn('[PredictionService] Not enough manufacturers in database');
+      return [];
+    }
+    
+    entitiesToUse = allManufacturers.map(m => ({ ...m, points: 0 }));
   }
 
-  const shuffled = topManufacturers.sort(() => Math.random() - 0.5);
+  const shuffled = entitiesToUse.sort(() => Math.random() - 0.5);
   const pairs: MatchupPair[] = [];
 
   for (let i = 0; i < count * 2; i += 2) {
@@ -152,12 +167,27 @@ async function generateStrainMatchups(count: number): Promise<MatchupPair[]> {
     .orderBy(desc(cannabisStrainDailyStats.totalPoints))
     .limit(20);
 
+  // Fallback: if not enough strains with stats, select random ones
+  let entitiesToUse = topStrains;
   if (topStrains.length < count * 2) {
-    console.warn('[PredictionService] Not enough strains for matchups');
-    return [];
+    console.warn('[PredictionService] Not enough strains with stats, using random selection');
+    const allStrains = await db
+      .select({
+        id: cannabisStrains.id,
+        name: cannabisStrains.name,
+      })
+      .from(cannabisStrains)
+      .limit(100);
+    
+    if (allStrains.length < count * 2) {
+      console.warn('[PredictionService] Not enough strains in database');
+      return [];
+    }
+    
+    entitiesToUse = allStrains.map(s => ({ ...s, points: 0 }));
   }
 
-  const shuffled = topStrains.sort(() => Math.random() - 0.5);
+  const shuffled = entitiesToUse.sort(() => Math.random() - 0.5);
   const pairs: MatchupPair[] = [];
 
   for (let i = 0; i < count * 2; i += 2) {
@@ -203,12 +233,27 @@ async function generateBrandMatchups(count: number): Promise<MatchupPair[]> {
     .orderBy(desc(brandDailyStats.totalPoints))
     .limit(20);
 
+  // Fallback: if not enough brands with stats, select random ones
+  let entitiesToUse = topBrands;
   if (topBrands.length < count * 2) {
-    console.warn('[PredictionService] Not enough brands for matchups');
-    return [];
+    console.warn('[PredictionService] Not enough brands with stats, using random selection');
+    const allBrands = await db
+      .select({
+        id: brands.id,
+        name: brands.name,
+      })
+      .from(brands)
+      .limit(100);
+    
+    if (allBrands.length < count * 2) {
+      console.warn('[PredictionService] Not enough brands in database');
+      return [];
+    }
+    
+    entitiesToUse = allBrands.map(b => ({ ...b, points: 0 }));
   }
 
-  const shuffled = topBrands.sort(() => Math.random() - 0.5);
+  const shuffled = entitiesToUse.sort(() => Math.random() - 0.5);
   const pairs: MatchupPair[] = [];
 
   for (let i = 0; i < count * 2; i += 2) {
@@ -254,12 +299,27 @@ async function generatePharmacyMatchups(count: number): Promise<MatchupPair[]> {
     .orderBy(desc(pharmacyDailyStats.totalPoints))
     .limit(20);
 
+  // Fallback: if not enough pharmacies with stats, select random ones
+  let entitiesToUse = topPharmacies;
   if (topPharmacies.length < count * 2) {
-    console.warn('[PredictionService] Not enough pharmacies for matchups');
-    return [];
+    console.warn('[PredictionService] Not enough pharmacies with stats, using random selection');
+    const allPharmacies = await db
+      .select({
+        id: pharmacies.id,
+        name: pharmacies.name,
+      })
+      .from(pharmacies)
+      .limit(100);
+    
+    if (allPharmacies.length < count * 2) {
+      console.warn('[PredictionService] Not enough pharmacies in database');
+      return [];
+    }
+    
+    entitiesToUse = allPharmacies.map(p => ({ ...p, points: 0 }));
   }
 
-  const shuffled = topPharmacies.sort(() => Math.random() - 0.5);
+  const shuffled = entitiesToUse.sort(() => Math.random() - 0.5);
   const pairs: MatchupPair[] = [];
 
   for (let i = 0; i < count * 2; i += 2) {
