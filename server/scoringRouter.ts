@@ -28,9 +28,17 @@ import {
   brands,
   dailyTeamScores,
   dailyScoringBreakdowns,
+  weeklyLineups,
+  productDailyChallengeStats,
 } from '../drizzle/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import {
+  mergeLineupWithBreakdowns,
+  CHALLENGE_SLOT_ORDER,
+  type ChallengeSlotInfo,
+  type ChallengeStatBreakdown,
+} from './utils/challengeBreakdownHelpers';
 
 export const scoringRouter = router({
   /**
@@ -555,6 +563,28 @@ export const scoringRouter = router({
           });
         }
 
+        const statDateObj = new Date(`${input.statDate}T00:00:00Z`);
+        if (Number.isNaN(statDateObj.getTime())) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Invalid stat date supplied',
+          });
+        }
+
+        const { year: lineupYear, week: lineupWeek } = getIsoYearWeekParts(statDateObj);
+
+        const lineupRecords = await db
+          .select()
+          .from(weeklyLineups)
+          .where(and(
+            eq(weeklyLineups.teamId, input.teamId),
+            eq(weeklyLineups.year, lineupYear),
+            eq(weeklyLineups.week, lineupWeek)
+          ))
+          .limit(1);
+
+        const lineupSlots = buildChallengeLineupSlots(lineupRecords[0]);
+
         let scores;
         try {
           scores = await db
@@ -598,56 +628,60 @@ export const scoringRouter = router({
 
         const score = scores[0];
 
-        const breakdowns = await db
+        const rawBreakdowns = await db
           .select()
           .from(dailyScoringBreakdowns)
           .where(eq(dailyScoringBreakdowns.dailyTeamScoreId, score.id));
 
-        const manufacturerIds: number[] = [];
-        const strainIds: number[] = [];
-        const productIds: number[] = [];
-        const pharmacyIds: number[] = [];
-        const brandIds: number[] = [];
+        const manufacturerIds = new Set<number>();
+        const strainIds = new Set<number>();
+        const productIds = new Set<number>();
+        const pharmacyIds = new Set<number>();
+        const brandIds = new Set<number>();
 
-        breakdowns.forEach((bd) => {
-          if (bd.assetType === 'manufacturer') {
-            manufacturerIds.push(bd.assetId);
-          } else if (bd.assetType === 'cannabis_strain') {
-            strainIds.push(bd.assetId);
-          } else if (bd.assetType === 'product') {
-            productIds.push(bd.assetId);
-          } else if (bd.assetType === 'pharmacy') {
-            pharmacyIds.push(bd.assetId);
-          } else if (bd.assetType === 'brand') {
-            brandIds.push(bd.assetId);
+        const collectAssetId = (assetType: string | null | undefined, assetId: number | null | undefined) => {
+          if (!assetId) return;
+          if (assetType === 'manufacturer') {
+            manufacturerIds.add(assetId);
+          } else if (assetType === 'cannabis_strain') {
+            strainIds.add(assetId);
+          } else if (assetType === 'product') {
+            productIds.add(assetId);
+          } else if (assetType === 'pharmacy') {
+            pharmacyIds.add(assetId);
+          } else if (assetType === 'brand') {
+            brandIds.add(assetId);
           }
-        });
+        };
+
+        rawBreakdowns.forEach((bd) => collectAssetId(bd.assetType, bd.assetId));
+        lineupSlots.forEach((slot) => collectAssetId(slot.assetType, slot.assetId));
 
         const [manufacturerNames, strainNames, productNames, pharmacyNames, brandNames] = await Promise.all([
-          manufacturerIds.length > 0
+          manufacturerIds.size > 0
             ? db.select({ id: manufacturers.id, name: manufacturers.name })
                 .from(manufacturers)
-                .where(inArray(manufacturers.id, manufacturerIds))
+                .where(inArray(manufacturers.id, Array.from(manufacturerIds)))
             : [],
-          strainIds.length > 0
+          strainIds.size > 0
             ? db.select({ id: cannabisStrains.id, name: cannabisStrains.name })
                 .from(cannabisStrains)
-                .where(inArray(cannabisStrains.id, strainIds))
+                .where(inArray(cannabisStrains.id, Array.from(strainIds)))
             : [],
-          productIds.length > 0
+          productIds.size > 0
             ? db.select({ id: strains.id, name: strains.name })
                 .from(strains)
-                .where(inArray(strains.id, productIds))
+                .where(inArray(strains.id, Array.from(productIds)))
             : [],
-          pharmacyIds.length > 0
+          pharmacyIds.size > 0
             ? db.select({ id: pharmacies.id, name: pharmacies.name })
                 .from(pharmacies)
-                .where(inArray(pharmacies.id, pharmacyIds))
+                .where(inArray(pharmacies.id, Array.from(pharmacyIds)))
             : [],
-          brandIds.length > 0
+          brandIds.size > 0
             ? db.select({ id: brands.id, name: brands.name })
                 .from(brands)
-                .where(inArray(brands.id, brandIds))
+                .where(inArray(brands.id, Array.from(brandIds)))
             : [],
         ]);
 
@@ -658,15 +692,39 @@ export const scoringRouter = router({
         pharmacyNames.forEach((p) => nameMap.set(p.id, p.name));
         brandNames.forEach((b) => nameMap.set(b.id, b.name));
 
-        const enrichedBreakdowns = breakdowns.map((bd) => ({
+        lineupSlots.forEach((slot) => {
+          if (slot.assetId) {
+            slot.assetName = nameMap.get(slot.assetId) ?? slot.assetName ?? null;
+          }
+        });
+
+        const enrichedBreakdowns = rawBreakdowns.map((bd) => ({
           ...bd,
           assetName: nameMap.get(bd.assetId) || null,
           breakdown: normalizeDailyBreakdownPayload(bd),
+          source: 'stats' as const,
+          hasStats: true,
         }));
+
+        const positionPoints = buildPositionPointMap(score);
+        const productSupplements = await buildMissingProductBreakdowns({
+          db,
+          statDate: input.statDate,
+          lineupSlots,
+          existingPositions: new Set(enrichedBreakdowns.map((bd) => bd.position)),
+          positionPoints,
+        });
+        const completeBreakdowns = mergeLineupWithBreakdowns({
+          lineupSlots,
+          statBreakdowns: [...enrichedBreakdowns, ...productSupplements],
+          fallbackBreakdown: (points) => createNoDataBreakdown(points),
+          positionPoints,
+          slotOrder: CHALLENGE_SLOT_ORDER,
+        });
 
         return {
           score,
-          breakdowns: enrichedBreakdowns,
+          breakdowns: completeBreakdowns,
         };
       } catch (error: any) {
         if (error instanceof TRPCError) {
@@ -692,6 +750,10 @@ export const scoringRouter = router({
 });
 
 type DailyBreakdownRow = typeof dailyScoringBreakdowns.$inferSelect;
+type WeeklyLineupRow = typeof weeklyLineups.$inferSelect;
+type DailyScoreRow = typeof dailyTeamScores.$inferSelect;
+type ProductDailyStatRow = typeof productDailyChallengeStats.$inferSelect;
+type DatabaseClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
 function normalizeDailyBreakdownPayload(bd: DailyBreakdownRow): BreakdownDetail {
   const current = (bd.breakdown ?? null) as BreakdownDetail | Record<string, any> | null;
@@ -775,4 +837,143 @@ function createNoDataBreakdown(totalPoints: number): BreakdownDetail {
   }
 
   return detail;
+}
+
+function buildChallengeLineupSlots(lineup?: WeeklyLineupRow | undefined): ChallengeSlotInfo[] {
+  if (!lineup) {
+    return CHALLENGE_SLOT_ORDER.map((slot) => ({
+      position: slot.position,
+      assetType: slot.assetType,
+      assetId: null,
+      assetName: null,
+    }));
+  }
+
+  const slotValues: Record<string, { assetType: string | null; assetId: number | null }> = {
+    MFG1: { assetType: 'manufacturer', assetId: lineup.mfg1Id ?? null },
+    MFG2: { assetType: 'manufacturer', assetId: lineup.mfg2Id ?? null },
+    CSTR1: { assetType: 'cannabis_strain', assetId: lineup.cstr1Id ?? null },
+    CSTR2: { assetType: 'cannabis_strain', assetId: lineup.cstr2Id ?? null },
+    PRD1: { assetType: 'product', assetId: lineup.prd1Id ?? null },
+    PRD2: { assetType: 'product', assetId: lineup.prd2Id ?? null },
+    PHM1: { assetType: 'pharmacy', assetId: lineup.phm1Id ?? null },
+    PHM2: { assetType: 'pharmacy', assetId: lineup.phm2Id ?? null },
+    BRD1: { assetType: 'brand', assetId: lineup.brd1Id ?? null },
+    FLEX: { assetType: lineup.flexType ?? null, assetId: lineup.flexId ?? null },
+  };
+
+  return CHALLENGE_SLOT_ORDER.map((slot) => {
+    const slotOverride = slotValues[slot.position];
+    if (!slotOverride) {
+      return {
+        position: slot.position,
+        assetType: slot.assetType,
+        assetId: null,
+        assetName: null,
+      };
+    }
+
+    return {
+      position: slot.position,
+      assetType: slotOverride.assetType ?? slot.assetType ?? null,
+      assetId: slotOverride.assetId,
+      assetName: null,
+    };
+  });
+}
+
+function buildPositionPointMap(score: DailyScoreRow) {
+  return {
+    MFG1: score.mfg1Points ?? 0,
+    MFG2: score.mfg2Points ?? 0,
+    CSTR1: score.cstr1Points ?? 0,
+    CSTR2: score.cstr2Points ?? 0,
+    PRD1: score.prd1Points ?? 0,
+    PRD2: score.prd2Points ?? 0,
+    PHM1: score.phm1Points ?? 0,
+    PHM2: score.phm2Points ?? 0,
+    BRD1: score.brd1Points ?? 0,
+    FLEX: score.flexPoints ?? 0,
+  };
+}
+
+function getIsoYearWeekParts(date: Date): { year: number; week: number } {
+  const tempDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dayNum = tempDate.getUTCDay() || 7;
+  tempDate.setUTCDate(tempDate.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return { year: tempDate.getUTCFullYear(), week };
+}
+
+async function buildMissingProductBreakdowns({
+  db,
+  statDate,
+  lineupSlots,
+  existingPositions,
+  positionPoints,
+}: {
+  db: DatabaseClient;
+  statDate: string;
+  lineupSlots: ChallengeSlotInfo[];
+  existingPositions: Set<string>;
+  positionPoints: ReturnType<typeof buildPositionPointMap>;
+}): Promise<ChallengeStatBreakdown[]> {
+  const productPositions = new Set(['PRD1', 'PRD2']);
+  const missingSlots = lineupSlots.filter(
+    (slot) =>
+      productPositions.has(slot.position) &&
+      !!slot.assetId &&
+      !existingPositions.has(slot.position)
+  );
+
+  if (missingSlots.length === 0) {
+    return [];
+  }
+
+  const uniqueProductIds = Array.from(new Set(missingSlots.map((slot) => slot.assetId!)));
+
+  const productStats = await db
+    .select()
+    .from(productDailyChallengeStats)
+    .where(and(
+      inArray(productDailyChallengeStats.productId, uniqueProductIds),
+      eq(productDailyChallengeStats.statDate, statDate)
+    ));
+
+  const statsByProductId = new Map<number, ProductDailyStatRow>();
+  productStats.forEach((stat) => {
+    statsByProductId.set(stat.productId, stat);
+  });
+
+  return missingSlots.map((slot) => {
+    const stat = statsByProductId.get(slot.assetId!);
+
+    if (stat) {
+      const productRecord = stat as ProductDailyStatRow;
+      const result = buildStrainDailyBreakdown(productRecord);
+      return {
+        position: slot.position,
+        assetType: slot.assetType ?? 'product',
+        assetId: slot.assetId,
+        assetName: slot.assetName ?? null,
+        breakdown: result.breakdown,
+        totalPoints: result.points,
+        source: 'stats',
+        hasStats: true,
+      };
+    }
+
+    const fallbackPoints = positionPoints[slot.position] ?? 0;
+    return {
+      position: slot.position,
+      assetType: slot.assetType ?? 'product',
+      assetId: slot.assetId,
+      assetName: slot.assetName ?? null,
+      breakdown: createNoDataBreakdown(fallbackPoints),
+      totalPoints: fallbackPoints,
+      source: 'lineup',
+      hasStats: false,
+    };
+  });
 }
