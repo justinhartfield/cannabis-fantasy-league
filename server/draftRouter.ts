@@ -21,6 +21,7 @@ import {
 import {
   manufacturerDailyChallengeStats,
   strainDailyChallengeStats,
+  productDailyChallengeStats,
   pharmacyDailyChallengeStats,
   brandDailyChallengeStats,
 } from "../drizzle/dailyChallengeSchema";
