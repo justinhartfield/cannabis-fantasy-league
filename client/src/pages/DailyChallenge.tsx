@@ -165,7 +165,6 @@ export default function DailyChallenge() {
     { enabled: !!challengeId && league?.status === 'complete' && isAuthenticated }
   );
 
-  const [redirecting, setRedirecting] = useState(false);
 
   const isAdmin = user?.role === "admin";
 
@@ -207,7 +206,7 @@ export default function DailyChallenge() {
         });
         // After showing result, redirect to draft
         setTimeout(() => {
-          setLocation(`/league/${challengeId}/draft`);
+          setLocation(`/challenge/${challengeId}/draft`);
         }, 5000);
       }
     },
@@ -285,13 +284,6 @@ export default function DailyChallenge() {
   }
 
   // Redirect non-challenges back to league detail
-  useEffect(() => {
-    if (league && league.leagueType !== "challenge") {
-      setRedirecting(true);
-      setLocation(`/league/${challengeId}`);
-    }
-  }, [league, challengeId, setLocation]);
-
   const baseTeamScores: TeamScore[] = useMemo(() => {
     if (dayScores && dayScores.length > 0) {
       return dayScores.map((score) => ({
@@ -409,8 +401,7 @@ export default function DailyChallenge() {
     authLoading ||
     leagueLoading ||
     scoresLoading ||
-    (selectedTeamId && breakdownLoading) ||
-    redirecting
+    (selectedTeamId && breakdownLoading)
   ) {
     return (
       <div className="min-h-screen gradient-dark flex items-center justify-center">
@@ -497,7 +488,7 @@ export default function DailyChallenge() {
                   </p>
                 </div>
                 <Button
-                  onClick={() => setLocation(`/league/${challengeId}/draft`)}
+                    onClick={() => setLocation(`/challenge/${challengeId}/draft`)}
                   className="gradient-primary"
                   size="lg"
                 >

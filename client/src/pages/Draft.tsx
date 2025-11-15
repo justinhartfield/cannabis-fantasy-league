@@ -272,7 +272,7 @@ export default function Draft() {
               variant="default"
               onClick={() => {
                 setShowDraftCompleteDialog(false);
-                setLocation(`/league/${leagueId}/lineup`);
+                setLocation(`/challenge/${leagueId}/lineup`);
               }}
               className="w-full sm:w-auto"
             >

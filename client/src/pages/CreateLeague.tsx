@@ -20,9 +20,16 @@ import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 
 export default function CreateLeague() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const createLeague = trpc.league.create.useMutation();
+
+  // Parse query parameter to preset leagueType
+  const getInitialLeagueType = (): "season" | "challenge" => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const type = searchParams.get("type");
+    return type === "challenge" ? "challenge" : "season";
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -35,7 +42,7 @@ export default function CreateLeague() {
     tradeDeadlineWeek: 13,
     playoffTeams: 6,
     isPublic: false,
-    leagueType: "season" as "season" | "challenge",
+    leagueType: getInitialLeagueType(),
   });
 
   // Redirect to login if not authenticated

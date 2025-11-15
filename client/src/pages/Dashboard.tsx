@@ -105,25 +105,26 @@ export default function Dashboard() {
             </Card>
           </Link>
 
-          <Card className="gradient-card border-border/50 h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-foreground flex items-center gap-2 mb-2">
-                    <Zap className="w-5 h-5 text-[#00D9FF]" />
-                    Daily Challenge
-                  </CardTitle>
-                  <CardDescription className="text-muted-foreground">
-                    24-hour head-to-head battles
-                  </CardDescription>
+          <Link href="/league/create?type=challenge">
+            <Card className="gradient-card border-border/50 card-hover-lift cursor-pointer h-full">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-foreground flex items-center gap-2 mb-2">
+                      <Zap className="w-5 h-5 text-[#00D9FF]" />
+                      Daily Challenge
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      24-hour head-to-head battles
+                    </CardDescription>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+                    <Plus className="w-6 h-6 text-white" />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">New challenge</p>
-                  <p className="text-xs text-[#00D9FF]">Daily at 8:00 AM</p>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+              </CardHeader>
+            </Card>
+          </Link>
         </div>
 
         {/* Prediction Streak Game Mode */}

@@ -60,7 +60,7 @@ export function LeagueNav({
             size="sm" 
             asChild
           >
-            <Link href={`/league/${leagueId}`}>
+            <Link href={`/challenge/${leagueId}`}>
               <Trophy className="w-4 h-4 mr-2" />
               Übersicht
             </Link>
@@ -70,7 +70,7 @@ export function LeagueNav({
             size="sm" 
             asChild
           >
-            <Link href={`/league/${leagueId}/scoring`}>
+            <Link href={`/challenge/${leagueId}/scoring`}>
               <BarChart3 className="w-4 h-4 mr-2" />
               Scoring
             </Link>
@@ -80,7 +80,7 @@ export function LeagueNav({
             size="sm" 
             asChild
           >
-            <Link href={`/league/${leagueId}/standings`}>
+            <Link href={`/challenge/${leagueId}/standings`}>
               <ListOrdered className="w-4 h-4 mr-2" />
               Tabelle
             </Link>
@@ -90,7 +90,7 @@ export function LeagueNav({
             size="sm" 
             asChild
           >
-            <Link href={`/league/${leagueId}/matchups`}>
+            <Link href={`/challenge/${leagueId}/matchups`}>
               <Swords className="w-4 h-4 mr-2" />
               Matchups
             </Link>
@@ -101,7 +101,7 @@ export function LeagueNav({
               size="sm" 
               asChild
             >
-              <Link href={`/league/${leagueId}/lineup`}>
+              <Link href={`/challenge/${leagueId}/lineup`}>
                 <UserCircle className="w-4 h-4 mr-2" />
                 Mein Lineup
               </Link>

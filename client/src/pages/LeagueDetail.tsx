@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Calendar, Settings, Copy, Check, Play, UserCircle, Trophy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { LeagueNav } from "@/components/LeagueNav";
+import DailyChallenge from "./DailyChallenge";
 
 export default function LeagueDetail() {
   const { id } = useParams();
@@ -24,7 +25,7 @@ export default function LeagueDetail() {
   const startDraftMutation = trpc.draft.startDraft.useMutation({
     onSuccess: () => {
       toast.success("Draft wurde gestartet!");
-      setLocation(`/league/${id}/draft`);
+      setLocation(`/challenge/${id}/draft`);
     },
     onError: (error) => {
       toast.error(`Fehler beim Starten des Drafts: ${error.message}`);
@@ -45,12 +46,6 @@ export default function LeagueDetail() {
     );
   }
 
-  useEffect(() => {
-    if (league?.leagueType === "challenge") {
-      setLocation(`/challenge/${league.id}`);
-    }
-  }, [league, setLocation]);
-
   if (!league) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -69,7 +64,7 @@ export default function LeagueDetail() {
   const userTeam = league.teams?.find((team: any) => team.userId === user?.id);
 
   if (league?.leagueType === "challenge") {
-    return null;
+    return <DailyChallenge />;
   }
 
   const copyLeagueCode = () => {
@@ -250,7 +245,7 @@ export default function LeagueDetail() {
                 <CardContent>
                   <Button
                     className="w-full"
-                    onClick={() => setLocation(`/league/${league.id}/draft`)}
+                    onClick={() => setLocation(`/challenge/${league.id}/draft`)}
                   >
                     <Play className="w-4 h-4 mr-2" />
                     Zum Draft
@@ -270,7 +265,7 @@ export default function LeagueDetail() {
                     <>
                       <Button
                         className="w-full"
-                        onClick={() => setLocation(`/league/${league.id}/pre-draft`)}
+                        onClick={() => setLocation(`/challenge/${league.id}/pre-draft`)}
                         disabled={!league.teams || league.teams.length < 2}
                       >
                         <Play className="w-4 h-4 mr-2" />
@@ -287,7 +282,7 @@ export default function LeagueDetail() {
                     <>
                       <Button
                         className="w-full"
-                        onClick={() => setLocation(`/league/${league.id}/draft`)}
+                        onClick={() => setLocation(`/challenge/${league.id}/draft`)}
                       >
                         <Play className="w-4 h-4 mr-2" />
                         Go to Draft
@@ -308,7 +303,7 @@ export default function LeagueDetail() {
                     </>
                   )}
                   <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/league/${league.id}/settings`}>
+                    <Link href={`/challenge/${league.id}/settings`}>
                       <Settings className="w-4 h-4 mr-2" />
                       Einstellungen
                     </Link>
@@ -338,7 +333,7 @@ export default function LeagueDetail() {
                   </div>
                   <div className="space-y-2">
                     <Button variant="outline" className="w-full" asChild>
-                      <Link href={`/league/${id}/lineup`}>
+                      <Link href={`/challenge/${id}/lineup`}>
                         Lineup bearbeiten
                       </Link>
                     </Button>
