@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import { UserCircle } from "lucide-react";
+import logoImage from "../cfl-logo.png";
 
 /**
  * Navigation Component
@@ -25,7 +26,7 @@ export function Navigation() {
           {/* Left side - Home link */}
           <Link href="/">
             <a className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
-              <img src="/src/cfl-logo.png" alt="Cannabis Fantasy League" className="h-8 w-auto" />
+              <img src={logoImage} alt="Cannabis Fantasy League" className="h-8 w-auto" />
             </a>
           </Link>
 
