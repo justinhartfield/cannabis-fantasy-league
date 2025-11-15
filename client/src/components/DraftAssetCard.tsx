@@ -184,11 +184,13 @@ export function DraftAssetCard({
                 {getCategoryLabel()}
               </Badge>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              {stats.map((stat, idx) => (
-                <span key={idx} className="text-xs text-muted-foreground whitespace-nowrap">
-                  {stat.label}: <span className="font-medium">{stat.value}</span>
-                </span>
+            <div className="flex items-center gap-2 mt-1">
+              {stats.slice(0, 2).map((stat, idx) => (
+                <div key={idx} className="px-2 py-1 rounded bg-primary/10 border border-primary/20">
+                  <span className="text-xs font-semibold text-primary">
+                    {stat.label}: {stat.value}
+                  </span>
+                </div>
               ))}
             </div>
           </div>

@@ -129,16 +129,16 @@ export default function DraftBoard({
   };
 
   // Sorting helper function
-  const sortAssets = <T extends { name: string; productCount?: number; favoriteCount?: number }>(assets: T[]): T[] => {
+  const sortAssets = <T extends { name: string; yesterdayPoints?: number | null; todayPoints?: number | null }>(assets: T[]): T[] => {
     const sorted = [...assets].sort((a, b) => {
       if (sortBy === "name") {
         return sortOrder === "asc" 
           ? a.name.localeCompare(b.name)
           : b.name.localeCompare(a.name);
       } else {
-        // Sort by stats (productCount for manufacturers, favoriteCount for products)
-        const aValue = a.productCount || a.favoriteCount || 0;
-        const bValue = b.productCount || b.favoriteCount || 0;
+        // Sort by yesterday's points (default)
+        const aValue = a.yesterdayPoints ?? 0;
+        const bValue = b.yesterdayPoints ?? 0;
         return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
       }
     });
@@ -179,32 +179,32 @@ export default function DraftBoard({
             <div className="text-center p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <Building2 className="w-4 h-4 mx-auto mb-1 text-blue-500" />
               <p className="text-xs text-muted-foreground">Hersteller</p>
-              <p className="text-lg font-bold text-foreground">{rosterNeeds.manufacturer}/2</p>
+              <p className="text-lg font-bold text-foreground">{rosterCounts.manufacturer}/2</p>
             </div>
             <div className="text-center p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
               <Leaf className="w-4 h-4 mx-auto mb-1 text-purple-500" />
               <p className="text-xs text-muted-foreground">Strains</p>
-              <p className="text-lg font-bold text-foreground">{rosterNeeds.cannabis_strain}/2</p>
+              <p className="text-lg font-bold text-foreground">{rosterCounts.cannabis_strain}/2</p>
             </div>
             <div className="text-center p-2 rounded-lg bg-pink-500/10 border border-pink-500/20">
               <Package className="w-4 h-4 mx-auto mb-1 text-pink-500" />
               <p className="text-xs text-muted-foreground">Produkte</p>
-              <p className="text-lg font-bold text-foreground">{rosterNeeds.product}/2</p>
+              <p className="text-lg font-bold text-foreground">{rosterCounts.product}/2</p>
             </div>
             <div className="text-center p-2 rounded-lg bg-green-500/10 border border-green-500/20">
               <Building2 className="w-4 h-4 mx-auto mb-1 text-green-500" />
               <p className="text-xs text-muted-foreground">Apotheken</p>
-              <p className="text-lg font-bold text-foreground">{rosterNeeds.pharmacy}/2</p>
+              <p className="text-lg font-bold text-foreground">{rosterCounts.pharmacy}/2</p>
             </div>
             <div className="text-center p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
               <Building2 className="w-4 h-4 mx-auto mb-1 text-yellow-500" />
               <p className="text-xs text-muted-foreground">Brands</p>
-              <p className="text-lg font-bold text-foreground">{rosterNeeds.brand || 0}/1</p>
+              <p className="text-lg font-bold text-foreground">{rosterCounts.brand}/1</p>
             </div>
             <div className="text-center p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
               <UserCircle className="w-4 h-4 mx-auto mb-1 text-orange-500" />
               <p className="text-xs text-muted-foreground">Flex</p>
-              <p className="text-lg font-bold text-foreground">{rosterNeeds.flex}/1</p>
+              <p className="text-lg font-bold text-foreground">{Math.max(0, myRoster.length - (rosterCounts.manufacturer + rosterCounts.cannabis_strain + rosterCounts.product + rosterCounts.pharmacy + rosterCounts.brand))}/1</p>
             </div>
           </div>
 
