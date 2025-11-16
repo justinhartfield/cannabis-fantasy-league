@@ -542,6 +542,7 @@ export const users = pgTable("users", {
 	createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 	updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
 	lastSignedIn: timestamp({ mode: 'string', withTimezone: true }).defaultNow().notNull(),
+	avatarUrl: varchar({ length: 500 }),
 },
 (table) => [
 	unique("users_openId_unique").on(table.openId),

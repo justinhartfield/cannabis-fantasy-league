@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import PredictionStreak from "./pages/PredictionStreak";
 import PredictionLeaderboard from "./pages/PredictionLeaderboard";
+import Profile from "./pages/Profile";
 import { useEffect } from "react";
 import { Navigation } from "./components/Navigation";
 
@@ -40,6 +41,7 @@ function Router() {
       <Route path={"/challenge/:id/scoring"} component={Scoring} />
       <Route path={"/prediction-streak"} component={PredictionStreak} />
       <Route path={"/prediction-leaderboard"} component={PredictionLeaderboard} />
+      <Route path={"/profile"} component={Profile} />
       <Route path={"/invitations/:token"} component={AcceptInvitation} />
       <Route path={"/admin"} component={Admin} />
 

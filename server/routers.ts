@@ -15,6 +15,7 @@ import { playoffRouter } from "./playoffRouter";
 import { invitationRouter } from "./invitationRouter";
 import { adminRouter } from "./routes/adminRouter";
 import { predictionRouter } from "./predictionRouter";
+import { profileRouter } from "./profileRouter";
 
 
 export const appRouter = router({
@@ -45,6 +46,7 @@ export const appRouter = router({
   invitation: invitationRouter,
   admin: adminRouter,
   prediction: predictionRouter,
+  profile: profileRouter,
 
 });
 

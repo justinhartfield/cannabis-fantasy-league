@@ -32,12 +32,14 @@ export function Navigation() {
 
           {/* Right side - User info */}
           {user && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/50 border border-border/50">
-              <UserCircle className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">
-                {user.name || user.email}
-              </span>
-            </div>
+            <Link href="/profile">
+              <a className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/50 border border-border/50 hover:bg-card hover:border-primary/50 transition-all cursor-pointer">
+                <UserCircle className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">
+                  {user.name || user.email}
+                </span>
+              </a>
+            </Link>
           )}
         </div>
       </div>

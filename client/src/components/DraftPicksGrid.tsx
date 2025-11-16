@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus, Flame, Star, Gem } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TeamAvatar } from "@/components/TeamAvatar";
 
 interface DraftPick {
   pickNumber: number;
@@ -15,6 +16,8 @@ interface DraftPick {
   lastWeekPoints: number | null;
   trendPercent: number | null;
   pickTime: string;
+  userAvatarUrl?: string | null;
+  userName?: string | null;
 }
 
 interface DraftPicksGridProps {
@@ -151,9 +154,12 @@ export function DraftPicksGrid({ picks, currentPickNumber }: DraftPicksGridProps
                       <p className="text-sm font-bold text-foreground truncate">
                         {pick.assetName}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {pick.teamName}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <TeamAvatar avatarUrl={pick.userAvatarUrl} teamName={pick.teamName} userName={pick.userName} size="sm" />
+                        <p className="text-xs text-muted-foreground truncate">
+                          {pick.teamName}
+                        </p>
+                      </div>
                     </div>
                   </div>
 

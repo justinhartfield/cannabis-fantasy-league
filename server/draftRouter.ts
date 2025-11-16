@@ -840,13 +840,19 @@ export const draftRouter = router({
         .where(eq(draftPicks.leagueId, input.leagueId))
         .orderBy(draftPicks.pickNumber);
 
-      // Get team names
-      const teamMap = new Map<number, string>();
+      // Get team names and user data
+      const teamMap = new Map<number, { name: string; userName: string | null; userAvatarUrl: string | null }>();
       const leagueTeams = await db
-        .select()
+        .select({
+          teamId: teams.id,
+          teamName: teams.name,
+          userName: users.name,
+          userAvatarUrl: users.avatarUrl,
+        })
         .from(teams)
+        .leftJoin(users, eq(teams.userId, users.id))
         .where(eq(teams.leagueId, input.leagueId));
-      leagueTeams.forEach(t => teamMap.set(t.id, t.name));
+      leagueTeams.forEach(t => teamMap.set(t.teamId, { name: t.teamName, userName: t.userName, userAvatarUrl: t.userAvatarUrl }));
 
       // Process each pick to get asset name and stats
       const enrichedPicks = await Promise.all(picks.map(async (pick) => {
@@ -1019,11 +1025,14 @@ export const draftRouter = router({
           }
         }
 
+        const teamData = teamMap.get(pick.teamId);
         return {
           pickNumber: pick.pickNumber,
           round: pick.round,
           teamId: pick.teamId,
-          teamName: teamMap.get(pick.teamId) || "Unknown Team",
+          teamName: teamData?.name || "Unknown Team",
+          userName: teamData?.userName || null,
+          userAvatarUrl: teamData?.userAvatarUrl || null,
           assetType: pick.assetType,
           assetId: pick.assetId,
           assetName,

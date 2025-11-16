@@ -30,12 +30,15 @@ import { cn } from "@/lib/utils";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { TeamAvatar } from "@/components/TeamAvatar";
 
 interface TeamScore {
   teamId: number;
   teamName: string;
   points: number;
   rank?: number;
+  userAvatarUrl?: string | null;
+  userName?: string | null;
 }
 
 interface ChallengeSummary {
@@ -298,6 +301,8 @@ export default function DailyChallenge() {
         teamId: team.id,
         teamName: team.name || `Team ${index + 1}`,
         points: 0,
+        userAvatarUrl: team.userAvatarUrl,
+        userName: team.userName,
       }));
     }
 
@@ -588,6 +593,8 @@ export default function DailyChallenge() {
                     name={leader.teamName}
                     score={leader.points}
                     highlight
+                    avatarUrl={leader.userAvatarUrl}
+                    userName={leader.userName}
                   />
                 ) : (
                   <EmptyTeamBlock />
@@ -624,6 +631,8 @@ export default function DailyChallenge() {
                   <TeamScoreBlock
                     name={challenger.teamName}
                     score={challenger.points}
+                    avatarUrl={challenger.userAvatarUrl}
+                    userName={challenger.userName}
                   />
                 ) : league?.leagueCode ? (
                   <InviteBlock
@@ -723,6 +732,7 @@ export default function DailyChallenge() {
                         >
                           {team.rank}
                         </div>
+                        <TeamAvatar avatarUrl={team.userAvatarUrl} teamName={team.teamName} userName={team.userName} size="md" />
                         <div>
                           <div
                             className={cn(
@@ -949,10 +959,14 @@ function TeamScoreBlock({
   name,
   score,
   highlight = false,
+  avatarUrl,
+  userName,
 }: {
   name?: string;
   score?: number;
   highlight?: boolean;
+  avatarUrl?: string | null;
+  userName?: string | null;
 }) {
   return (
     <div
@@ -962,7 +976,10 @@ function TeamScoreBlock({
       )}
     >
       <div className="text-xs uppercase text-muted-foreground mb-2">Team</div>
-      <div className="text-xl font-bold text-foreground truncate">{name || "Team"}</div>
+      <div className="flex items-center gap-2 mb-1">
+        <TeamAvatar avatarUrl={avatarUrl} teamName={name || "Team"} userName={userName} size="md" />
+        <div className="text-xl font-bold text-foreground truncate">{name || "Team"}</div>
+      </div>
       <div className="text-4xl font-bold text-gradient-primary mt-3">
         {score?.toFixed(1) ?? "0.0"}
       </div>

@@ -193,6 +193,7 @@ export const leagueRouter = router({
             ...t.team,
             userName: t.user.name,
             userEmail: t.user.email,
+            userAvatarUrl: t.user.avatarUrl,
           })),
           isCommissioner: league.commissionerUserId === ctx.user.id,
           isMember: !!userTeam,
@@ -787,6 +788,7 @@ export const leagueRouter = router({
             draftPosition: teams.draftPosition,
             userId: teams.userId,
             userName: users.name,
+            userAvatarUrl: users.avatarUrl,
           })
           .from(teams)
           .leftJoin(users, eq(teams.userId, users.id))
