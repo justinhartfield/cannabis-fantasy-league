@@ -289,7 +289,7 @@ export class DailyChallengeAggregator {
 
   /**
    * Aggregate strain stats and calculate scores
-   * Now uses Metabase public query for pre-aggregated strain data
+   * Now uses Metabase queries for pre-aggregated strain data
    */
   private async aggregateStrains(
     db: Database,
@@ -297,11 +297,27 @@ export class DailyChallengeAggregator {
     orders: OrderRecord[],
     logger?: AggregationLogger
   ): Promise<EntityAggregationSummary> {
-    await this.log('info', 'Aggregating strains from Metabase public query...', undefined, logger);
+    await this.log('info', 'Aggregating strains from Metabase...', undefined, logger);
 
-    // Fetch pre-aggregated strain data from Metabase public query
-    // This query groups by ProductStrainName and returns aggregated metrics
-    const strainData = await this.metabase.executePublicQuery('fbaa0280-5995-43c3-b93b-7ac5da834bef');
+    // Determine if we're aggregating for today or a past date
+    const targetDate = new Date(dateString);
+    const today = new Date();
+    const isToday = 
+      targetDate.getFullYear() === today.getFullYear() &&
+      targetDate.getMonth() === today.getMonth() &&
+      targetDate.getDate() === today.getDate();
+
+    // Use different queries based on date
+    // Today: public query 8a68ba19-e659-4649-a435-9f1266a44853
+    // Past dates: card 1267 (requires API key)
+    let strainData;
+    if (isToday) {
+      await this.log('info', 'Using today\'s strains query (public)', undefined, logger);
+      strainData = await this.metabase.executePublicQuery('8a68ba19-e659-4649-a435-9f1266a44853');
+    } else {
+      await this.log('info', 'Using yesterday\'s strains query (card 1267)', undefined, logger);
+      strainData = await this.metabase.executeCardQuery(1267);
+    }
     
     await this.log('info', `Fetched ${strainData.length} strains from Metabase`, undefined, logger);
 
@@ -375,6 +391,7 @@ export class DailyChallengeAggregator {
   }
   /**
    * Aggregate product (pharmaceutical product) stats and calculate scores
+   * Now uses Metabase queries for pre-aggregated product data
    */
   private async aggregateProducts(
     db: Database,
@@ -382,30 +399,48 @@ export class DailyChallengeAggregator {
     orders: OrderRecord[],
     logger?: AggregationLogger
   ): Promise<EntityAggregationSummary> {
-    await this.log('info', 'Aggregating products...', undefined, logger);
+    await this.log('info', 'Aggregating products from Metabase...', undefined, logger);
 
-    const stats = new Map<string, { salesVolumeGrams: number; orderCount: number }>();
+    // Determine if we're aggregating for today or a past date
+    const targetDate = new Date(dateString);
+    const today = new Date();
+    const isToday = 
+      targetDate.getFullYear() === today.getFullYear() &&
+      targetDate.getMonth() === today.getMonth() &&
+      targetDate.getDate() === today.getDate();
 
-    for (const order of orders) {
-      const name = order.ProductName;
-      if (!name) continue;
-
-      const quantity = order.Quantity || 0;
-
-      const current = stats.get(name) || { salesVolumeGrams: 0, orderCount: 0 };
-      current.salesVolumeGrams += quantity;
-      current.orderCount += 1;
-      stats.set(name, current);
+    // Use different queries based on date
+    // Today: card 1269 (requires API key)
+    // Past dates: public query 56623750-b096-445c-a130-7518fd629491
+    let productData;
+    if (isToday) {
+      await this.log('info', 'Using today\'s products query (card 1269)', undefined, logger);
+      productData = await this.metabase.executeCardQuery(1269);
+    } else {
+      await this.log('info', 'Using yesterday\'s products query (public)', undefined, logger);
+      productData = await this.metabase.executePublicQuery('56623750-b096-445c-a130-7518fd629491');
     }
+    
+    await this.log('info', `Fetched ${productData.length} products from Metabase`, undefined, logger);
 
-    const sorted = Array.from(stats.entries()).sort((a, b) => b[1].salesVolumeGrams - a[1].salesVolumeGrams);
+    const sorted = productData; // Already sorted by Metabase query
 
     let processed = 0;
     let skipped = 0;
 
     for (let i = 0; i < sorted.length; i++) {
-      const [name, data] = sorted[i];
+      const item = sorted[i];
       const rank = i + 1;
+      
+      // Metabase query returns: Name, Quantity (grams), Sales, Orders, etc.
+      const name = item.Name;
+      if (!name) {
+        skipped += 1;
+        continue;
+      }
+
+      const salesVolumeGrams = item.Quantity || 0;
+      const orderCount = item.Orders || 0;
 
       const product = await db.query.strains.findFirst({
         where: (strains, { eq }) => eq(strains.name, name),
@@ -413,19 +448,19 @@ export class DailyChallengeAggregator {
 
       if (!product) {
         skipped += 1;
-        await this.log('warn', `Product not found: ${name}`, undefined, logger);
+        await this.log('warn', `Product not found in database: ${name}`, undefined, logger);
         continue;
       }
 
-      const scoring = calculateStrainScore(data, rank);
+      const scoring = calculateStrainScore({ salesVolumeGrams, orderCount }, rank);
 
       await db
         .insert(productDailyChallengeStats)
         .values({
           productId: product.id,
           statDate: dateString,
-          salesVolumeGrams: data.salesVolumeGrams,
-          orderCount: data.orderCount,
+          salesVolumeGrams,
+          orderCount,
           totalPoints: scoring.totalPoints,
           rank,
           createdAt: new Date(),
@@ -434,8 +469,8 @@ export class DailyChallengeAggregator {
         .onConflictDoUpdate({
           target: [productDailyChallengeStats.productId, productDailyChallengeStats.statDate],
           set: {
-            salesVolumeGrams: data.salesVolumeGrams,
-            orderCount: data.orderCount,
+            salesVolumeGrams,
+            orderCount,
             totalPoints: scoring.totalPoints,
             rank,
             updatedAt: new Date(),
@@ -443,12 +478,16 @@ export class DailyChallengeAggregator {
         });
 
       processed += 1;
-      await this.log(
-        'info',
-        `${name}: ${data.salesVolumeGrams}g, ${scoring.totalPoints} pts (rank #${rank})`,
-        undefined,
-        logger
-      );
+      
+      // Log top 10 products
+      if (rank <= 10) {
+        await this.log(
+          'info',
+          `${name}: ${salesVolumeGrams}g, ${orderCount} orders, ${scoring.totalPoints} pts (rank #${rank})`,
+          undefined,
+          logger
+        );
+      }
     }
 
     return { processed, skipped };
