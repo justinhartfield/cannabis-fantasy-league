@@ -4,7 +4,7 @@ import { getDb } from "./db";
 import { users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { storagePut } from "./storage";
+import { bunnyStoragePut } from "./bunnyStorage";
 
 /**
  * Profile Router
@@ -144,8 +144,8 @@ export const profileRouter = router({
         const fileExtension = input.fileName.split(".").pop() || "jpg";
         const storageKey = `avatars/${ctx.user.id}/${timestamp}.${fileExtension}`;
 
-        // Upload to storage
-        const { url } = await storagePut(storageKey, buffer, input.contentType);
+        // Upload to Bunny CDN storage
+        const url = await bunnyStoragePut(storageKey, buffer, input.contentType);
 
         // Update user's avatarUrl in database
         await db
