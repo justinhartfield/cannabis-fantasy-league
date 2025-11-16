@@ -320,6 +320,9 @@ export const draftRouter = router({
         : [];
 
       const draftedIds = draftedProducts.map((r) => r.assetId);
+      
+      console.log('[getAvailableProducts] Drafted IDs:', draftedIds);
+      console.log('[getAvailableProducts] Team IDs in league:', teamIds);
 
       // Get available products
       let query = db.select().from(strains);
@@ -360,8 +363,16 @@ export const draftRouter = router({
       console.log('[getAvailableProducts] Sample data:', result.slice(0, 3).map(p => ({
         name: p.name,
         yesterdayPoints: p.yesterdayPoints,
-        todayPoints: p.todayPoints
+        todayPoints: p.todayPoints,
       })));
+      
+      // Check if Demecan Typ 1 is in results
+      const demecan = result.find(p => p.name === 'Demecan Typ 1');
+      if (demecan) {
+        console.log('[getAvailableProducts] ⚠️  Demecan Typ 1 FOUND in results (ID:', demecan.id, ')');
+      } else {
+        console.log('[getAvailableProducts] ✅ Demecan Typ 1 NOT in results (correctly filtered)');
+      }
       
       return result;
     }),
