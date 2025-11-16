@@ -163,6 +163,9 @@ export const draftRouter = router({
         : [];
 
       const draftedIds = draftedManufacturers.map((r) => r.assetId);
+      
+      console.log('[getAvailableManufacturers] Drafted IDs:', draftedIds);
+      console.log('[getAvailableManufacturers] Team IDs in league:', teamIds);
 
       // Get available manufacturers
       let query = db.select().from(manufacturers);
